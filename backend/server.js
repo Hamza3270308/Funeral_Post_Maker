@@ -26,14 +26,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/templates', require('./routes/templateRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/funeral_post_maker';
 
 // Connect to MongoDB
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
+    app.listen(PORT, '127.0.0.1', () => {
       console.log(`Server running on port ${PORT}`);
     });
   })
