@@ -149,9 +149,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _resolveImageUrl(String url) {
-    if (url.startsWith('http://127.0.0.1:5001')) {
-      return url.replaceFirst('http://127.0.0.1:5001', ApiService.baseUrl);
-    }
+    // Use ApiService to resolve the image URL dynamically
+    return ApiService.resolveImageUrl(url);
     return url;
   }
 

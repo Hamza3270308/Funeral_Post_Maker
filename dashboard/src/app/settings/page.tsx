@@ -34,10 +34,11 @@ export default function SettingsPage() {
     return '1920';
   });
   const [backendUrl, setBackendUrl] = useState(() => {
+    // If not set, use the environment variable provided by Coolify Docker Compose, or the live backend by default
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('settings_backend_url') || `http://${window.location.hostname}:5001`;
+      return localStorage.getItem('settings_backend_url') || process.env.NEXT_PUBLIC_API_URL || 'http://q14c5cff8kaukmncrx1w60rf.31.97.48.137.sslip.io';
     }
-    return 'http://127.0.0.1:5001';
+    return process.env.NEXT_PUBLIC_API_URL || 'http://q14c5cff8kaukmncrx1w60rf.31.97.48.137.sslip.io';
   });
   const [primaryColor, setPrimaryColor] = useState(() => {
     if (typeof window !== 'undefined') {

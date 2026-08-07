@@ -5,7 +5,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    # Ports section removed so Coolify handles the routing via Traefik automatically
+    ports:
+      - "5101:5001"
     environment:
       - NODE_ENV=production
       - PORT=5001
@@ -18,10 +19,12 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    # Ports section removed so Coolify handles the routing via Traefik automatically
+    ports:
+      - "3101:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://q14c5cff8kaukmncrx1w60rf.31.97.48.137.sslip.io
     restart: unless-stopped
     deploy:
       resources:

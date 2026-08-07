@@ -7,7 +7,7 @@ import 'dart:io' show Platform;
 
 class ApiService {
   // 10.0.2.2 is for Android emulator, 127.0.0.1 is for iOS simulator.
-  static String baseUrl = Platform.isAndroid ? 'http://10.0.2.2:5001' : 'http://127.0.0.1:5001';
+  static String baseUrl = 'http://q14c5cff8kaukmncrx1w60rf.31.97.48.137.sslip.io';
 
   static String resolveImageUrl(String url) {
     if (url.isEmpty) return url;
