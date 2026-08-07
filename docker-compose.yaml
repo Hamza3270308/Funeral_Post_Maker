@@ -14,5 +14,15 @@ services:
     volumes:
       - backend-uploads:/app/uploads
 
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    # Ports section removed so Coolify handles the routing via Traefik automatically
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+
 volumes:
   backend-uploads:
