@@ -10,6 +10,7 @@ class ExportScreen extends StatefulWidget {
   final Template template;
   final String deceasedName;
   final String lifespanDates;
+  final String designTitle;
 
   const ExportScreen({
     super.key,
@@ -17,6 +18,7 @@ class ExportScreen extends StatefulWidget {
     required this.template,
     required this.deceasedName,
     required this.lifespanDates,
+    this.designTitle = 'Untitled Memorial',
   });
 
   @override
@@ -26,6 +28,59 @@ class ExportScreen extends StatefulWidget {
 class _ExportScreenState extends State<ExportScreen> {
   bool _isSavingDevice = false;
   bool _isSavingApp = false;
+  late String _currentTitle;
+  late TextEditingController _titleController;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTitle = widget.designTitle;
+    _titleController = TextEditingController(text: _currentTitle);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  void _showRenameDialog() {
+    _titleController.text = _currentTitle;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename Memorial Design', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: TextField(
+          controller: _titleController,
+          decoration: const InputDecoration(
+            labelText: 'Design Title',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                if (_titleController.text.trim().isNotEmpty) {
+                  _currentTitle = _titleController.text.trim();
+                }
+              });
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBAFF00),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _saveToDevice() async {
     setState(() {
@@ -33,9 +88,10 @@ class _ExportScreenState extends State<ExportScreen> {
     });
 
     try {
+      final safeName = _currentTitle.replaceAll(' ', '_').replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
       final downloadDir = Directory('/storage/emulated/0/Download');
       if (await downloadDir.exists()) {
-        final fileName = 'tribute_${DateTime.now().millisecondsSinceEpoch}.png';
+        final fileName = '${safeName}_${DateTime.now().millisecondsSinceEpoch}.png';
         final destFile = File('${downloadDir.path}/$fileName');
         
         await File(widget.imagePath).copy(destFile.path);
@@ -51,7 +107,7 @@ class _ExportScreenState extends State<ExportScreen> {
       } else {
         // Fallback to app documents
         final appDocDir = await getApplicationDocumentsDirectory();
-        final fileName = 'tribute_${DateTime.now().millisecondsSinceEpoch}.png';
+        final fileName = '${safeName}_${DateTime.now().millisecondsSinceEpoch}.png';
         final destFile = File('${appDocDir.path}/$fileName');
         
         await File(widget.imagePath).copy(destFile.path);
@@ -59,8 +115,8 @@ class _ExportScreenState extends State<ExportScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Saved to App Documents: $fileName'),
-              backgroundColor: Colors.orange[800],
+              content: Text('Tribute saved to App Storage: $fileName'),
+              backgroundColor: Colors.green[800],
             ),
           );
         }
@@ -69,7 +125,7 @@ class _ExportScreenState extends State<ExportScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save to device: $e'),
+            content: Text('Failed to save: $e'),
             backgroundColor: Colors.red[800],
           ),
         );
@@ -83,34 +139,25 @@ class _ExportScreenState extends State<ExportScreen> {
     }
   }
 
-  Future<void> _saveToApp() async {
+  Future<void> _saveToAppDashboard() async {
     setState(() {
       _isSavingApp = true;
     });
 
     try {
-      // Map layers to include customized values
-      final updatedTextLayers = widget.template.textLayers.map((text) {
-        if (text.id == '2') {
-          return text.copyWith(content: widget.deceasedName);
-        } else if (text.id == 'date') {
-          return text.copyWith(content: widget.lifespanDates);
-        }
-        return text;
-      }).toList();
-
-      final updatedTemplate = widget.template.copyWith(
-        title: 'Tribute - ${widget.deceasedName}',
-        textLayers: updatedTextLayers,
-      );
-
-      final success = await ApiService.updateTemplate(updatedTemplate);
+      final updatedTemplate = widget.template.copyWith(title: _currentTitle);
+      bool success = false;
+      if (updatedTemplate.id == 'new' || updatedTemplate.id.isEmpty) {
+        success = await ApiService.createTemplate(updatedTemplate);
+      } else {
+        success = await ApiService.updateTemplate(updatedTemplate);
+      }
 
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Successfully updated open template in dashboard database!'),
+              content: Text('"$_currentTitle" saved to your dashboard!'),
               backgroundColor: Colors.green[800],
             ),
           );
@@ -145,7 +192,23 @@ class _ExportScreenState extends State<ExportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Export Options'),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                _currentTitle,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              onPressed: _showRenameDialog,
+              tooltip: 'Rename Design',
+            ),
+          ],
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -178,82 +241,35 @@ class _ExportScreenState extends State<ExportScreen> {
             // Save to Device Option Card
             Card(
               color: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: AppTheme.borderSoft),
-              ),
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.sunlitCream,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.save_alt_rounded,
-                    color: AppTheme.terracotta,
-                  ),
-                ),
-                title: const Text(
-                  'Save to Device',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.walnutBrown),
-                ),
-                subtitle: const Text('Save image directly to your Downloads folder'),
+                leading: const Icon(Icons.download_rounded, color: AppTheme.textDark, size: 32),
+                title: const Text('Save to Device', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Download high-res PNG image to your photo library'),
                 trailing: _isSavingDevice
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.terracotta),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                        onPressed: _saveToDevice,
-                      ),
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: _isSavingDevice ? null : _saveToDevice,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            // Save to App Option Card
+            // Save to App Templates & Favorites Option Card
             Card(
               color: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: AppTheme.borderSoft),
-              ),
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.sunlitCream,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.cloud_upload_rounded,
-                    color: AppTheme.terracotta,
-                  ),
-                ),
-                title: const Text(
-                  'Save to App',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.walnutBrown),
-                ),
-                subtitle: const Text('Save customized data layout back to templates dashboard'),
+                leading: const Icon(Icons.cloud_upload_rounded, color: AppTheme.goldAccent, size: 32),
+                title: const Text('Save to App Templates & Favorites', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Save design project to edit later on Web or Mobile'),
                 trailing: _isSavingApp
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.terracotta),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                        onPressed: _saveToApp,
-                      ),
-                onTap: _isSavingApp ? null : _saveToApp,
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: _isSavingApp ? null : _saveToAppDashboard,
               ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),

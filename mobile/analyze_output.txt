@@ -1,0 +1,313 @@
+Analyzing editor_screen.dart...
+
+  error - editor_screen.dart:1522:15 - The function '_getTrayHeight' isn't defined. Try importing the library that defines '_getTrayHeight', correcting the name to the name of an existing function, or defining a function named '_getTrayHeight'. - undefined_function
+  error - editor_screen.dart:1522:30 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1533:10 - The body might complete normally, causing 'null' to be returned, but the return type, 'Widget', is a potentially non-nullable type. Try adding either a return or a throw statement at the end. - body_might_complete_normally
+  error - editor_screen.dart:1534:13 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1563:18 - Undefined name '_currentOverlay'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1573:72 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1573:72 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1577:113 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1577:113 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1584:33 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1586:27 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1587:29 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1594:17 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1596:35 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:1631:45 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1637:60 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1637:60 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1641:53 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1641:53 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1662:28 - Undefined name '_messageContent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1664:31 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1670:35 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1678:45 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1678:45 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1691:30 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1693:49 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1699:15 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1699:30 - Undefined name '_messageContent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1724:24 - The function '_addOverlayGraphic' isn't defined. Try importing the library that defines '_addOverlayGraphic', correcting the name to the name of an existing function, or defining a function named '_addOverlayGraphic'. - undefined_function
+  error - editor_screen.dart:1787:5 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1788:11 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1789:9 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1791:11 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1791:56 - Undefined name '_startingLine'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1792:11 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1792:54 - Undefined name '_deceasedName'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1793:11 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1793:55 - Undefined name '_lifespanDates'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1794:11 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1794:59 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1795:9 - Undefined name '_messageContent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1801:9 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1802:7 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1803:16 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1806:9 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:1809:28 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1821:25 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1822:13 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1822:37 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1823:11 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1825:19 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1834:25 - Undefined name '_textEditingController'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1835:43 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1835:43 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1845:53 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1845:53 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1849:53 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1849:53 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1852:54 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1852:54 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1854:19 - Undefined name '_textEditingController'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1871:36 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1871:51 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1874:38 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1879:53 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1879:53 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1882:83 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1882:83 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1893:36 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1893:51 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1896:38 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1901:53 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1901:53 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1910:49 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1923:59 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1923:59 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1934:32 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1935:31 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1938:21 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1943:39 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:1951:77 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:1951:77 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:1967:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1975:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1983:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:1996:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2004:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2012:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2020:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2033:62 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2033:62 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2039:32 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2040:31 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2043:21 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2044:86 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2046:39 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:2049:90 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2049:90 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2051:59 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2051:59 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2057:32 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2058:31 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2061:21 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2064:39 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:2067:87 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2067:87 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2087:37 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2090:34 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2110:31 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2112:22 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2128:5 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2129:7 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2130:47 - Undefined name '_textEditingController'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2130:77 - Undefined name '_startingLine'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2131:45 - Undefined name '_textEditingController'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2131:75 - Undefined name '_deceasedName'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2132:46 - Undefined name '_textEditingController'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2132:76 - Undefined name '_lifespanDates'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2133:48 - Undefined name '_textEditingController'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2133:78 - Undefined name '_messageContent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2135:11 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2136:9 - Undefined name '_textEditingController'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2136:39 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2163:29 - Undefined name '_frameShapeIndex'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2167:21 - The function '_pickCustomFrameImage' isn't defined. Try importing the library that defines '_pickCustomFrameImage', correcting the name to the name of an existing function, or defining a function named '_pickCustomFrameImage'. - undefined_function
+  error - editor_screen.dart:2169:21 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2169:36 - Undefined name '_frameShapeIndex'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2170:21 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:2177:36 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2179:30 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2204:13 - Undefined name '_frameShapeIndex'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2211:32 - Undefined name '_pickCustomFrameImage'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2213:40 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2218:55 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2218:55 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2223:23 - Undefined name '_customFrameImagePath'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2241:22 - Undefined name '_pickPhoto'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2243:30 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2248:45 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2248:45 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2271:28 - Undefined name '_pickBackgroundPhoto'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2273:36 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2278:51 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2278:51 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2292:34 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2292:49 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2295:36 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2299:51 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2299:51 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2326:30 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2326:45 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2329:65 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2329:65 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2333:47 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2333:47 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2344:24 - Undefined name 'allWebGoogleFonts'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2346:28 - Undefined name 'allWebGoogleFonts'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2353:36 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2362:34 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2362:34 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2369:19 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2370:25 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2370:70 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2371:25 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2371:68 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2372:25 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2372:69 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2373:25 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2373:71 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2385:9 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2385:33 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2386:14 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2386:26 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2406:13 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2413:32 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2413:47 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2416:67 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2416:67 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2420:49 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2420:49 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2438:23 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2439:29 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2439:53 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2440:27 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2440:39 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2442:29 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2443:38 - Undefined name '_currentOverlay'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2458:51 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2498:67 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2498:67 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2500:28 - Undefined name '_showCustomColorPicker'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2502:36 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2508:51 - Invalid constant value. - invalid_constant
+  error - editor_screen.dart:2508:51 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2532:29 - Undefined name '_canvasBgTint'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2534:30 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2534:45 - Undefined name '_canvasBgTint'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2541:38 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2541:52 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2585:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2586:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2591:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2592:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2597:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2598:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2603:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2604:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2609:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2610:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2615:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2616:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2621:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2622:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2627:23 - Undefined name '_activeTray'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2628:26 - The function '_toggleTray' isn't defined. Try importing the library that defines '_toggleTray', correcting the name to the name of an existing function, or defining a function named '_toggleTray'. - undefined_function
+  error - editor_screen.dart:2654:30 - Undefined name '_limeAccent'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2656:49 - Undefined name '_darkBlack'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2682:5 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2683:11 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2683:35 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2684:23 - Undefined name '_textStyles'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2684:35 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2692:16 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2733:16 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2763:16 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2768:15 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2768:63 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2769:30 - Undefined name '_overlayItems'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2769:70 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2770:22 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2771:30 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2791:21 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2792:27 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2792:75 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2793:25 - Undefined name '_overlayItems'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2793:65 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2794:34 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2795:25 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2799:39 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:2820:19 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2828:5 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2829:11 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2829:59 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2830:22 - Undefined name '_overlayItems'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2830:62 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2832:18 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2833:9 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2833:38 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2834:9 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2834:38 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2841:16 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2855:19 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2856:25 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2856:73 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2857:36 - Undefined name '_overlayItems'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2857:76 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2859:32 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2860:23 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2860:59 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2862:21 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:2868:19 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2869:25 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2869:73 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2870:36 - Undefined name '_overlayItems'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2870:76 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2872:32 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2873:23 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2873:57 - Undefined name '_activeTextLayer'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2875:21 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:2889:9 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2889:55 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2892:9 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2893:21 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2895:16 - Undefined name '_selectedType'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2895:64 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2896:20 - Undefined name '_overlayItems'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2896:60 - Undefined name '_selectedOverlayId'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2907:26 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2929:15 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:2930:17 - Undefined name '_isLayersPanelOpen'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2970:36 - Undefined name 'context'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:2999:25 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:3000:21 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:3011:23 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:3021:23 - Undefined name 'widget'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:3031:23 - Undefined name '_overlayItems'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:3074:21 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:3075:23 - Undefined name '_isLayersPanelOpen'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - editor_screen.dart:3094:17 - The function 'setState' isn't defined. Try importing the library that defines 'setState', correcting the name to the name of an existing function, or defining a function named 'setState'. - undefined_function
+  error - editor_screen.dart:3103:19 - The function '_saveState' isn't defined. Try importing the library that defines '_saveState', correcting the name to the name of an existing function, or defining a function named '_saveState'. - undefined_function
+  error - editor_screen.dart:3121:1 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+warning - editor_screen.dart:446:11 - The value of the local variable 'selectedColor' isn't used. Try removing the variable or using it. - unused_local_variable
+warning - editor_screen.dart:862:11 - The value of the local variable 'renderWidth' isn't used. Try removing the variable or using it. - unused_local_variable
+warning - editor_screen.dart:863:11 - The value of the local variable 'renderHeight' isn't used. Try removing the variable or using it. - unused_local_variable
+   info - editor_screen.dart:91:8 - The private field _isLayersPanelOpen could be 'final'. Try making the field 'final'. - prefer_final_fields
+   info - editor_screen.dart:235:10 - The private field _customBorderRadius could be 'final'. Try making the field 'final'. - prefer_final_fields
+   info - editor_screen.dart:298:20 - The local variable '_styleFromLayer' starts with an underscore. Try renaming the variable to not start with an underscore. - no_leading_underscores_for_local_identifiers
+   info - editor_screen.dart:445:8 - The declaration '_showCustomColorPicker' isn't referenced. Try removing the declaration of '_showCustomColorPicker'. - unused_element
+   info - editor_screen.dart:503:8 - The declaration '_toggleTray' isn't referenced. Try removing the declaration of '_toggleTray'. - unused_element
+   info - editor_screen.dart:522:8 - The declaration '_addOverlayGraphic' isn't referenced. Try removing the declaration of '_addOverlayGraphic'. - unused_element
+   info - editor_screen.dart:565:26 - The declaration '_currentOverlay' isn't referenced. Try removing the declaration of '_currentOverlay'. - unused_element
+   info - editor_screen.dart:575:16 - The declaration '_pickPhoto' isn't referenced. Try removing the declaration of '_pickPhoto'. - unused_element
+   info - editor_screen.dart:587:16 - The declaration '_pickBackgroundPhoto' isn't referenced. Try removing the declaration of '_pickBackgroundPhoto'. - unused_element
+   info - editor_screen.dart:599:16 - The declaration '_pickCustomFrameImage' isn't referenced. Try removing the declaration of '_pickCustomFrameImage'. - unused_element
+   info - editor_screen.dart:658:10 - The declaration '_getTrayHeight' isn't referenced. Try removing the declaration of '_getTrayHeight'. - unused_element
+   info - editor_screen.dart:3098:43 - Statements in an if should be enclosed in a block. Try wrapping the statement in a block. - curly_braces_in_flow_control_structures
+   info - editor_screen.dart:3099:49 - Statements in an if should be enclosed in a block. Try wrapping the statement in a block. - curly_braces_in_flow_control_structures
+   info - editor_screen.dart:3100:49 - Statements in an if should be enclosed in a block. Try wrapping the statement in a block. - curly_braces_in_flow_control_structures
+   info - editor_screen.dart:3101:56 - Statements in an if should be enclosed in a block. Try wrapping the statement in a block. - curly_braces_in_flow_control_structures
+
+309 issues found.

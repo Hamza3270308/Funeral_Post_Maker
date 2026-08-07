@@ -6,25 +6,24 @@ import { Trash2, Edit, LayoutDashboard, FileStack, Palette, Settings } from 'luc
 interface Template {
   _id: string;
   title: string;
-  category: string;
+  thumbnailUrl?: string;
   status: 'draft' | 'active';
   background: {
     type: 'color' | 'image' | 'gradient';
     value: string;
   };
-  thumbnailUrl?: string;
 }
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     let isMounted = true;
-    fetch('http://127.0.0.1:5001/api/templates/admin')
+    const apiBase = '';
+    fetch(`${apiBase}/api/templates/admin`, { cache: 'no-store' })
       .then((response) => {
         if (response.ok) {
           return response.json();
@@ -52,13 +51,32 @@ export default function TemplatesPage() {
     e.preventDefault();
     if (!confirm('Are you sure you want to delete this template?')) return;
     try {
-      const response = await fetch(`http://127.0.0.1:5001/api/templates/${id}`, { method: 'DELETE' });
+      const apiBase = '';
+      const response = await fetch(`${apiBase}/api/templates/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setIsLoading(true);
         setRefreshKey((prev) => prev + 1);
       }
     } catch (error) {
       console.error('Failed to delete template:', error);
+    }
+  };
+
+  const handleToggleStatus = async (id: string, currentStatus: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    const newStatus = currentStatus === 'active' ? 'draft' : 'active';
+    try {
+      const apiBase = '';
+      const response = await fetch(`${apiBase}/api/templates/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (response.ok) {
+        setRefreshKey((prev) => prev + 1);
+      }
+    } catch (error) {
+      console.error('Failed to toggle status:', error);
     }
   };
 
@@ -113,31 +131,8 @@ export default function TemplatesPage() {
           </div>
         ) : (
           <div>
-            {/* Category Pills & Search */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
-              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', maxWidth: '100%' }}>
-                {['All', 'Traditional', 'Modern', 'Floral', 'Spiritual', 'Classic'].map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setCategoryFilter(cat)}
-                    className={`btn ${categoryFilter === cat ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      background: categoryFilter === cat ? 'var(--accent-color)' : 'white',
-                      color: categoryFilter === cat ? 'white' : 'var(--text-primary)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '20px',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-              
+            {/* Search */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '20px' }}>
               <input 
                 type="text"
                 placeholder="Search templates..."
@@ -157,9 +152,9 @@ export default function TemplatesPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '25px' }}>
               {templates
                 .filter(t => {
-                  const matchesCategory = categoryFilter === 'All' || t.category?.toLowerCase() === categoryFilter.toLowerCase();
-                  const matchesSearch = t.title?.toLowerCase().includes(searchQuery.toLowerCase());
-                  return matchesCategory && matchesSearch;
+                  const matchesSearch = searchQuery === '' || 
+                    (t.title?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+                  return matchesSearch;
                 })
                 .map((template) => {
                   const hasBgImage = template.background && template.background.type === 'image';
@@ -170,7 +165,9 @@ export default function TemplatesPage() {
                       {/* Thumbnail Preview */}
                       <div style={{ 
                         height: '240px', 
-                        background: hasBgImage ? `url(${bgValue}) center/cover` : bgValue,
+                        background: template.thumbnailUrl && template.thumbnailUrl !== ''
+                            ? `url("${template.thumbnailUrl}") center/contain no-repeat`
+                            : (hasBgImage ? `url("${bgValue}") center/cover no-repeat` : bgValue),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -203,19 +200,36 @@ export default function TemplatesPage() {
                         <h3 style={{ margin: '0 0 5px 0', fontSize: '18px', color: 'var(--text-primary)' }}>
                           {template.title || 'Untitled Template'}
                         </h3>
-                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', display: 'block' }}>
-                          Category: {template.category || 'General'}
-                        </span>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          Status: <span style={{ fontWeight: '500', color: template.status === 'active' ? '#4caf50' : '#ff9800' }}>{template.status || 'draft'}</span>
+                        </p>
 
                         {/* Action Buttons */}
-                        <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
                           <Link 
                             href={`/creator?id=${template._id}`} 
                             className="btn btn-primary" 
-                            style={{ flex: 1, textDecoration: 'none', gap: '8px', fontSize: '14px' }}
+                            style={{ flex: 1, textDecoration: 'none', gap: '6px', fontSize: '13px' }}
                           >
-                            <Edit size={14} style={{ marginRight: '5px' }} /> Edit
+                            <Edit size={14} style={{ marginRight: '4px' }} /> Edit
                           </Link>
+                          <button
+                            onClick={(e) => handleToggleStatus(template._id, template.status, e)}
+                            className="btn"
+                            style={{
+                              background: template.status === 'active' ? '#FEF3C7' : '#D1FAE5',
+                              color: template.status === 'active' ? '#92400E' : '#065F46',
+                              border: 'none',
+                              padding: '8px 10px',
+                              borderRadius: 'var(--radius-md)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}
+                            title={template.status === 'active' ? "Unpublish to Draft" : "Publish to Active"}
+                          >
+                            {template.status === 'active' ? 'Unpublish' : 'Publish'}
+                          </button>
                           <button 
                             onClick={(e) => handleDelete(template._id, e)} 
                             className="btn" 
@@ -223,7 +237,7 @@ export default function TemplatesPage() {
                               background: '#FEE2E2', 
                               color: '#EF4444', 
                               border: 'none', 
-                              padding: '10px', 
+                              padding: '8px 10px', 
                               borderRadius: 'var(--radius-md)',
                               cursor: 'pointer'
                             }}

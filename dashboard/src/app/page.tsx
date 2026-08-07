@@ -21,7 +21,7 @@ import {
 interface TemplateSummary {
   _id: string;
   title: string;
-  category: string;
+  thumbnailUrl?: string;
   status: 'draft' | 'active';
   background: {
     type: 'color' | 'image' | 'gradient';
@@ -36,12 +36,12 @@ export default function Home() {
   const [stats, setStats] = useState({ active: 0, drafts: 0, downloads: 0 });
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     let isMounted = true;
-    fetch('http://127.0.0.1:5001/api/templates/admin')
+    const apiBase = '';
+    fetch(`${apiBase}/api/templates/admin`, { cache: 'no-store' })
       .then((response) => {
         if (response.ok) {
           return response.json();
@@ -72,7 +72,8 @@ export default function Home() {
     e.preventDefault();
     if (!confirm('Are you sure you want to delete this template?')) return;
     try {
-      const response = await fetch(`http://127.0.0.1:5001/api/templates/${id}`, { method: 'DELETE' });
+      const apiBase = '';
+      const response = await fetch(`${apiBase}/api/templates/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setRefreshKey((prev) => prev + 1);
       }
@@ -193,38 +194,18 @@ export default function Home() {
           </div>
         </section>
         
-        {/* Statistics Cards Grid */}
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '40px' }}>
-           <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-             <div className="icon-ring" style={{ background: '#FEF3C7', color: 'var(--accent-color)' }}>
-               <CheckCircle size={22} />
-             </div>
-             <div>
-               <h4 style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>Active Templates</h4>
-               <h3 style={{ margin: '4px 0 0 0', fontSize: '28px', fontFamily: 'var(--font-interface)', fontWeight: '700' }}>{stats.active}</h3>
-             </div>
-           </div>
-
-           <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-             <div className="icon-ring" style={{ background: '#EFF6FF', color: '#3B82F6' }}>
-               <FileText size={22} />
-             </div>
-             <div>
-               <h4 style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>Drafts</h4>
-               <h3 style={{ margin: '4px 0 0 0', fontSize: '28px', fontFamily: 'var(--font-interface)', fontWeight: '700' }}>{stats.drafts}</h3>
-             </div>
-           </div>
-
-           <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-             <div className="icon-ring" style={{ background: '#F0FDF4', color: '#22C55E' }}>
-               <Download size={22} />
-             </div>
-             <div>
-               <h4 style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>Total Downloads</h4>
-               <h3 style={{ margin: '4px 0 0 0', fontSize: '28px', fontFamily: 'var(--font-interface)', fontWeight: '700' }}>{stats.downloads}</h3>
-             </div>
-           </div>
-        </section>
+         {/* Statistics Cards Grid */}
+         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '40px' }}>
+            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div className="icon-ring" style={{ background: '#FEF3C7', color: 'var(--accent-color)' }}>
+                <CheckCircle size={22} />
+              </div>
+              <div>
+                <h4 style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>Active Templates</h4>
+                <h3 style={{ margin: '4px 0 0 0', fontSize: '28px', fontFamily: 'var(--font-interface)', fontWeight: '700' }}>{stats.active}</h3>
+              </div>
+            </div>
+         </section>
 
         {/* Recent Templates Table/List */}
         <section className="card" style={{ padding: '28px' }}>
@@ -243,29 +224,8 @@ export default function Home() {
             </div>
           ) : (
             <div>
-              {/* Category Pills & Search */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-                  {['All', 'Traditional', 'Modern', 'Floral', 'Spiritual', 'Classic'].map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setCategoryFilter(cat)}
-                      className={`btn ${categoryFilter === cat ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        background: categoryFilter === cat ? 'var(--accent-color)' : 'white',
-                        color: categoryFilter === cat ? 'white' : 'var(--text-primary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '20px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
+              {/* Search */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '20px' }}>
                 
                 <input 
                   type="text"
@@ -286,9 +246,9 @@ export default function Home() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {templates
                   .filter(t => {
-                    const matchesCategory = categoryFilter === 'All' || t.category?.toLowerCase() === categoryFilter.toLowerCase();
-                    const matchesSearch = t.title?.toLowerCase().includes(searchQuery.toLowerCase());
-                    return matchesCategory && matchesSearch;
+                    const matchesSearch = searchQuery === '' || 
+                      (t.title?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+                    return matchesSearch;
                   })
                   .slice(0, 5)
                   .map(t => {
@@ -316,7 +276,9 @@ export default function Home() {
                             width: '44px', 
                             height: '44px', 
                             borderRadius: '6px', 
-                            background: hasBgImage ? `url(${bgValue}) center/cover` : bgValue,
+                            background: t.thumbnailUrl && t.thumbnailUrl !== ''
+                                ? `url("${t.thumbnailUrl}") center/contain no-repeat`
+                                : (hasBgImage ? `url("${bgValue}") center/cover no-repeat` : bgValue),
                             border: '1px solid var(--border-color)',
                             flexShrink: 0
                           }} />
@@ -324,9 +286,9 @@ export default function Home() {
                             <h4 style={{ margin: '0 0 2px 0', fontSize: '15px', color: 'var(--text-primary)', fontFamily: 'var(--font-interface)', fontWeight: '600' }}>
                               {t.title || 'Untitled Template'}
                             </h4>
-                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                              Category: {t.category || 'General'}
-                            </span>
+                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
+                              Status: <span style={{ fontWeight: '500', color: t.status === 'active' ? '#4caf50' : '#ff9800' }}>{t.status || 'draft'}</span>
+                            </p>
                           </div>
                         </div>
                         

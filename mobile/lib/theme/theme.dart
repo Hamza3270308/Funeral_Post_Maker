@@ -1,91 +1,99 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color terracotta = Color(0xFFA76F5E);
-  static const Color sunlitCream = Color(0xFFF6E3BA);
-  static const Color linenBackground = Color(0xFFFAF6F0);
-  static const Color walnutBrown = Color(0xFF3E2723);
+  static const Color accentNeon = Color(0xFFCCFF00); // Lime Green
+  static const Color goldAccent = Color(0xFFD4AF37); // Classic Gold
+  static const Color darkBackground = Color(0xFF0A0A0A);
+  static const Color darkSurface = Color(0xFF141518);
+  static const Color lightBackground = Color(0xFFF2F4F7);
+  static const Color lightSurface = Colors.white;
   
-  static const Color textPrimary = Color(0xFF3E2723);
-  static const Color textSecondary = Color(0xFF705E52);
-  static const Color borderSoft = Color(0xFFE6DEC9);
+  static const Color textDark = Color(0xFF111111);
+  static const Color textLight = Colors.white;
+  static const Color textGray = Color(0xFF8E8E93);
+  static const Color borderSoft = Color(0xFFE5E5EA);
 
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: const ColorScheme.light(
-        primary: terracotta,
-        secondary: sunlitCream,
-        surface: linenBackground,
+        primary: textDark,
+        secondary: accentNeon,
+        surface: lightBackground,
         onPrimary: Colors.white,
-        onSecondary: walnutBrown,
-        onSurface: textPrimary,
+        onSecondary: textDark,
+        onSurface: textDark,
       ),
-      scaffoldBackgroundColor: linenBackground,
+      scaffoldBackgroundColor: lightBackground,
       appBarTheme: const AppBarTheme(
-        backgroundColor: linenBackground,
+        backgroundColor: lightBackground,
         elevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
-          fontFamily: 'serif',
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          color: textPrimary,
+          fontFamily: 'Inter',
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: textDark,
         ),
-        iconTheme: IconThemeData(color: textPrimary),
+        iconTheme: IconThemeData(color: textDark),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: terracotta,
-          foregroundColor: Colors.white,
-          elevation: 1,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          backgroundColor: accentNeon,
+          foregroundColor: textDark,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(100), // Pill shape
           ),
           textStyle: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Inter',
           ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: lightSurface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: borderSoft),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: borderSoft),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: terracotta, width: 1.5),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: textDark, width: 2),
         ),
-        labelStyle: const TextStyle(color: textSecondary),
+        labelStyle: const TextStyle(color: textGray),
       ),
       textTheme: const TextTheme(
         headlineMedium: TextStyle(
-          fontFamily: 'serif',
-          fontSize: 28,
-          fontWeight: FontWeight.bold,
-          color: textPrimary,
+          fontFamily: 'Inter',
+          fontSize: 32,
+          fontWeight: FontWeight.w800,
+          color: textDark,
+          letterSpacing: -0.5,
         ),
         titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: textPrimary,
+          fontFamily: 'Inter',
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: textDark,
         ),
         bodyLarge: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 16,
-          color: textPrimary,
+          color: textDark,
         ),
         bodyMedium: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 14,
-          color: textSecondary,
+          color: textGray,
         ),
       ),
     );

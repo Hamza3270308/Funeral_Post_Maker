@@ -3,9 +3,34 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/template.dart';
 
+import 'dart:io' show Platform;
+
 class ApiService {
-  // 10.0.2.2 is the special loopback IP address mapping to the host's localhost in the Android emulator.
-  static String baseUrl = 'http://10.0.2.2:5001';
+  // 10.0.2.2 is for Android emulator, 127.0.0.1 is for iOS simulator.
+  static String baseUrl = Platform.isAndroid ? 'http://10.0.2.2:5001' : 'http://127.0.0.1:5001';
+
+  static String resolveImageUrl(String url) {
+    if (url.isEmpty) return url;
+    if (url.startsWith('/')) {
+      return '$baseUrl$url';
+    }
+    
+    // Replace hardcoded localhost IPs from the web dashboard with the emulator's backend URL
+    if (url.startsWith('http://127.0.0.1:5001')) {
+      return url.replaceFirst('http://127.0.0.1:5001', baseUrl);
+    }
+    if (url.startsWith('http://localhost:5001')) {
+      return url.replaceFirst('http://localhost:5001', baseUrl);
+    }
+    if (url.startsWith('http://localhost:3000')) {
+      return url.replaceFirst('http://localhost:3000', baseUrl);
+    }
+    if (url.startsWith('http://127.0.0.1:3000')) {
+      return url.replaceFirst('http://127.0.0.1:3000', baseUrl);
+    }
+    
+    return url;
+  }
 
   static Future<List<Template>> fetchTemplates() async {
     try {
@@ -54,6 +79,19 @@ class ApiService {
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('ERROR UPDATING TEMPLATE: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteTemplate(String id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/templates/$id'),
+      );
+      print('SERVER RESPONSE DELETE: ${response.statusCode}');
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      print('ERROR DELETING TEMPLATE: $e');
       return false;
     }
   }

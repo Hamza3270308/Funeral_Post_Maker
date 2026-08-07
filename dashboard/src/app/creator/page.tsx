@@ -14,9 +14,10 @@ import {
   FileImage, 
   Wallpaper,
   Layers,
-  ChevronLeft
+  ChevronLeft,
+  Flower2
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const GOOGLE_FONTS_LIBRARY = [
   'Inter',
@@ -86,7 +87,35 @@ interface Layer {
   borderColor?: string;
   rotation?: number;
   borderRadius?: number;
+  locked?: boolean;
+  textBackgroundColor?: string;
+  textPadding?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  outlineWidth?: number;
+  outlineColor?: string;
+  lineHeight?: number;
+  letterSpacing?: number;
+  textTransform?: string;
+  imageScale?: number;
+  imageOffsetX?: number;
+  imageOffsetY?: number;
+  mixBlendMode?: string;
   children?: Layer[];
+  isCustomWidth?: boolean;
+  hasShadow?: boolean;
+  glowColor?: string;
+  glowBlur?: number;
+  echoColor?: string;
+  echoOffsetX?: number;
+  echoOffsetY?: number;
+  neonColor?: string;
+  neonIntensity?: number;
+  curveIntensity?: number;
+  frameStyle?: string;
+  alignment?: string;
 }
 
 interface HistoryState {
@@ -97,9 +126,15 @@ interface HistoryState {
   solidColor: string;
 }
 
+const apiBase = '';
+
 function CreatorStudio() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const templateId = searchParams.get('id');
+  const currentTemplateIdRef = useRef<string | null>(searchParams.get('id'));
+  const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(searchParams.get('id'));
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(1080);
   const [canvasHeight, setCanvasHeight] = useState(1920);
 
@@ -107,7 +142,9 @@ function CreatorStudio() {
   useEffect(() => {
     const w = searchParams.get('width');
     const h = searchParams.get('height');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (w) setCanvasWidth(Number(w));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (h) setCanvasHeight(Number(h));
   }, [searchParams]);
 
@@ -119,12 +156,7 @@ function CreatorStudio() {
   const scale = previewHeight / canvasHeight;
   const previewWidth = canvasWidth * scale;
 
-  const [layers, setLayers] = useState<Layer[]>([
-    { id: '1', type: 'text', content: 'In Loving Memory', x: 120, y: 150, fontSize: 80, color: '#2E3338', fontFamily: 'Inter', width: 800, height: 100, visible: true },
-    { id: '2', type: 'text', content: 'John Doe', x: 150, y: 300, fontSize: 140, color: '#1E252B', fontFamily: 'Inter', width: 800, height: 160, visible: true },
-    { id: 'date', type: 'text', content: 'Sunrise 1950 - Sunset 2024', x: 120, y: 460, fontSize: 60, color: '#64748B', fontFamily: 'Inter', width: 840, height: 80, visible: true },
-    { id: '3', type: 'image_frame', shape: 'circle', x: 300, y: 600, width: 480, height: 480, visible: true, src: null }
-  ]);
+  const [layers, setLayers] = useState<Layer[]>([]);
   
   const [templateName, setTemplateName] = useState('Custom Template');
   const [background, setBackground] = useState<string | null>(null);
@@ -139,15 +171,18 @@ function CreatorStudio() {
   const [shapeColor2, setShapeColor2] = useState('#C5A880');
   const [shapeAngle, setShapeAngle] = useState(135);
 
-  const [activeLayerId, setActiveLayerId] = useState<string | null>('2');
-  const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>(['2']);
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; layerId: string | null }>({ visible: false, x: 0, y: 0, layerId: null });
   const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const [snapToGrid, setSnapToGrid] = useState(true);
-  const [rightSidebarTab, setRightSidebarTab] = useState<'elements' | 'verses' | 'graphics'>('elements');
+  const [rightSidebarTab, setRightSidebarTab] = useState<'elements' | 'verses' | 'graphics' | 'flowers'>('elements');
   const [elementSubPanel, setElementSubPanel] = useState<'main' | 'shape_selector' | 'frame_selector'>('main');
+  const [activeTextEffect, setActiveTextEffect] = useState<string | null>(null);
   const [isDraggingCustom, setIsDraggingCustom] = useState(false);
-  const [templateCategory, setTemplateCategory] = useState('Traditional');
+
+  const [showFontDropdown, setShowFontDropdown] = useState(false);
+  const [shapeGradientType, setShapeGradientType] = useState<'two-color' | 'transparent'>('two-color');
 
   const selectLayer = useCallback((id: string | null) => {
     setActiveLayerId(id);
@@ -158,11 +193,17 @@ function CreatorStudio() {
         const colorVal = layer.color || '#C5A880';
         if (colorVal.startsWith('linear-gradient')) {
           setShapeFillType('gradient');
-          const match = colorVal.match(/linear-gradient\((\d+)deg,\s*(#[a-fA-F0-9]{6}),\s*(#[a-fA-F0-9]{6})\)/);
+          const match = colorVal.match(/linear-gradient\((\d+)deg,\s*(#[a-fA-F0-9]{6}),\s*(#[a-fA-F0-9]{6}|transparent)\)/);
           if (match) {
             setShapeAngle(parseInt(match[1]));
             setShapeColor1(match[2]);
-            setShapeColor2(match[3]);
+            if (match[3] === 'transparent') {
+              setShapeGradientType('transparent');
+              setShapeColor2('#000000');
+            } else {
+              setShapeGradientType('two-color');
+              setShapeColor2(match[3]);
+            }
           }
         } else {
           setShapeFillType('solid');
@@ -373,16 +414,23 @@ function CreatorStudio() {
   }, [layers, activeLayerId, clipboard, history, selectLayer]);
 
   useEffect(() => {
-    if (!templateId) return;
+    const initialId = searchParams.get('id');
+    if (!initialId) return;
 
-    fetch(`http://127.0.0.1:5001/api/templates/${templateId}`)
+    fetch(`${apiBase}/api/templates/${initialId}`, { cache: 'no-store' })
       .then((res) => {
         if (res.ok) return res.json();
-        throw new Error('Failed to load template');
+        return null;
       })
       .then((data) => {
+        if (!data) {
+          alert('Template not found or deleted. Starting a new template.');
+          window.location.href = '/creator';
+          return;
+        }
+        
         if (data.title) setTemplateName(data.title);
-        if (data.category) setTemplateCategory(data.category);
+
         if (data.width) setCanvasWidth(data.width);
         if (data.height) setCanvasHeight(data.height);
         if (data.background) {
@@ -404,25 +452,28 @@ function CreatorStudio() {
           }
         }
         
+        const w = data.width || 1080;
+        const h = data.height || 1080;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const loadedText = (data.textLayers || []).map((l: any) => ({
           id: l.id,
           type: 'text',
           content: l.content,
           fontFamily: l.fontFamily,
-          fontSize: l.fontSize,
+          fontSize: l.fontSize * w,
           color: l.color,
           alignment: l.alignment,
-          x: l.x,
-          y: l.y,
-          width: l.width,
-          height: l.height,
+          x: l.x * w,
+          y: l.y * h,
+          width: l.width ? l.width * w : undefined,
+          height: l.height ? l.height * h : undefined,
           fontWeight: l.fontWeight || 'normal',
           fontStyle: l.fontStyle || 'normal',
           textDecoration: l.textDecoration || 'none',
           opacity: l.opacity !== undefined ? l.opacity : 1,
           rotation: l.rotation || 0,
-          visible: true
+          visible: true,
+          zIndex: l.zIndex !== undefined ? l.zIndex : 0
         }));
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -433,15 +484,17 @@ function CreatorStudio() {
           shape: l.type === 'frame' 
             ? (l.maskShape === 'circle' ? 'circle' : l.maskShape === 'rounded_rect' ? 'rounded-rectangle' : 'square') 
             : undefined,
-          x: l.x,
-          y: l.y,
-          width: l.width,
-          height: l.height,
+          x: l.x * w,
+          y: l.y * h,
+          width: l.width * w,
+          height: l.height * h,
           rotation: l.rotation || 0,
           opacity: l.opacity !== undefined ? l.opacity : 1,
-          borderWidth: l.borderWidth || 0,
+          borderWidth: (l.borderWidth || 0) * w,
           borderColor: l.borderColor || '#000000',
-          visible: true
+          mixBlendMode: l.mixBlendMode || 'normal',
+          visible: true,
+          zIndex: l.zIndex !== undefined ? l.zIndex : 0
         }));
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -450,24 +503,27 @@ function CreatorStudio() {
           type: 'shape',
           shape: l.shape || 'square',
           color: l.color || '#4A6572',
-          x: l.x,
-          y: l.y,
-          width: l.width,
-          height: l.height,
+          x: l.x * w,
+          y: l.y * h,
+          width: l.width * w,
+          height: l.height * h,
           opacity: l.opacity !== undefined ? l.opacity : 1,
-          borderWidth: l.borderWidth || 0,
+          borderWidth: (l.borderWidth || 0) * w,
           borderColor: l.borderColor || '#000000',
           rotation: l.rotation || 0,
-          visible: true
+          visible: true,
+          zIndex: l.zIndex !== undefined ? l.zIndex : 0
         }));
 
-        setLayers([...loadedText, ...loadedImage, ...loadedShape]);
+        const allLayers = [...loadedText, ...loadedImage, ...loadedShape];
+        allLayers.sort((a, b) => a.zIndex - b.zIndex);
+        setLayers(allLayers);
       })
       .catch((err) => {
         console.error(err);
         alert('Failed to load template from database.');
       });
-  }, [templateId]);
+  }, [searchParams]);
 
   const activeLayer = layers.find(l => l.id === activeLayerId);
 
@@ -480,12 +536,14 @@ function CreatorStudio() {
     }
   };
 
-  const handleShapeGradientChange = (color1: string, color2: string, angle: number) => {
+  const handleShapeGradientChange = (color1: string, color2: string, angle: number, gradType: 'two-color' | 'transparent' = shapeGradientType) => {
     setShapeColor1(color1);
     setShapeColor2(color2);
     setShapeAngle(angle);
+    setShapeGradientType(gradType);
     if (activeLayerId) {
-      const gradientStr = `linear-gradient(${angle}deg, ${color1}, ${color2})`;
+      const finalC2 = gradType === 'transparent' ? 'transparent' : color2;
+      const gradientStr = `linear-gradient(${angle}deg, ${color1}, ${finalC2})`;
       updateLayer(activeLayerId, { color: gradientStr });
     }
   };
@@ -567,6 +625,7 @@ function CreatorStudio() {
   };
 
   const handleDragStart = (e: React.MouseEvent, layer: Layer) => {
+    if (layer.locked) return;
     if (editingLayerId === layer.id) return;
     if (e.button !== 0) return; // Only handle left clicks
     e.stopPropagation();
@@ -792,11 +851,11 @@ function CreatorStudio() {
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     
-    const items = Array.from(layers);
+    const items = [...layers].reverse();
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
     
-    setLayers(items);
+    setLayers(items.reverse());
   };
 
   const deleteLayer = (id: string, e: React.MouseEvent) => {
@@ -877,7 +936,7 @@ function CreatorStudio() {
   const uploadFile = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await fetch('http://127.0.0.1:5001/api/upload', {
+    const response = await fetch(`${apiBase}/api/upload`, {
       method: 'POST',
       body: formData
     });
@@ -885,7 +944,7 @@ function CreatorStudio() {
       throw new Error('Failed to upload file');
     }
     const data = await response.json();
-    return `http://127.0.0.1:5001${data.url}`;
+    return `${apiBase}${data.url}`;
   };
 
   const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -904,72 +963,46 @@ function CreatorStudio() {
     }
   };
 
-  const handleSave = async () => {
-    const textLayers: Array<{
-      id: string;
-      content: string;
-      fontFamily: string;
-      fontSize: number;
-      color: string;
-      alignment: string;
-      x: number;
-      y: number;
-      width?: number;
-      height?: number;
-      fontWeight: string;
-      fontStyle: string;
-      textDecoration: string;
-      opacity: number;
-      rotation: number;
-    }> = [];
-
-    const imageLayers: Array<{
-      id: string;
-      type: 'frame' | 'sticker';
-      url: string;
-      maskShape: 'none' | 'circle' | 'rounded_rect';
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      rotation: number;
-      opacity: number;
-      borderWidth: number;
-      borderColor: string;
-    }> = [];
-
-    const shapeLayers: Array<{
-      id: string;
-      shape: string;
-      color: string;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      opacity: number;
-      borderWidth: number;
-      borderColor: string;
-      rotation: number;
-    }> = [];
-
-    layers.forEach((l) => {
+  const handleSave = async (isAutoSave = false) => {
+    const w = canvasWidth;
+    const h = canvasHeight;
+    // Collect text layers
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const textLayers: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const imageLayers: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const shapeLayers: any[] = [];
+    
+    layers.forEach((l, idx) => {
       if (l.type === 'text') {
         textLayers.push({
           id: l.id,
-          content: l.content || '',
+          content: l.content || 'Text',
           fontFamily: l.fontFamily || 'Inter',
-          fontSize: l.fontSize || 16,
+          fontSize: (l.fontSize || 16) / w,
           color: l.color || '#2E3338',
           alignment: l.alignment || 'center',
-          x: Math.round(l.x),
-          y: Math.round(l.y),
-          width: l.width ? Math.round(l.width) : undefined,
-          height: l.height ? Math.round(l.height) : undefined,
           fontWeight: l.fontWeight || 'normal',
           fontStyle: l.fontStyle || 'normal',
           textDecoration: l.textDecoration || 'none',
-          opacity: l.opacity !== undefined ? l.opacity : 1,
-          rotation: l.rotation || 0
+          x: l.x / w,
+          y: l.y / h,
+          width: l.width ? l.width / w : undefined,
+          height: l.height ? l.height / h : undefined,
+          rotation: l.rotation || 0,
+          hasShadow: l.hasShadow || false,
+          shadowColor: l.shadowColor || 'rgba(0,0,0,0.5)',
+          shadowBlur: (l.shadowBlur || 0) / w,
+          shadowOffsetX: (l.shadowOffsetX || 0) / w,
+          shadowOffsetY: (l.shadowOffsetY || 0) / h,
+          textBackgroundColor: l.textBackgroundColor || '',
+          outlineWidth: (l.outlineWidth || 0) / w,
+          outlineColor: l.outlineColor || '#000000',
+          lineHeight: l.lineHeight !== undefined ? l.lineHeight : 1.2,
+          letterSpacing: l.letterSpacing || 0,
+          textTransform: l.textTransform || 'none',
+          zIndex: idx
         });
       } else if (l.type === 'image_frame' || l.type === 'image') {
         imageLayers.push({
@@ -979,28 +1012,31 @@ function CreatorStudio() {
           maskShape: l.type === 'image_frame' 
             ? (l.shape === 'circle' ? 'circle' : l.shape === 'rounded-rectangle' ? 'rounded_rect' : 'none') 
             : 'none',
-          x: Math.round(l.x),
-          y: Math.round(l.y),
-          width: Math.round(l.width),
-          height: Math.round(l.height),
+          x: l.x / w,
+          y: l.y / h,
+          width: l.width / w,
+          height: l.height / h,
           rotation: l.rotation || 0,
           opacity: l.opacity !== undefined ? l.opacity : 1,
-          borderWidth: l.borderWidth || 0,
-          borderColor: l.borderColor || '#000000'
+          borderWidth: (l.borderWidth || 0) / w,
+          borderColor: l.borderColor || '#000000',
+          mixBlendMode: l.mixBlendMode || 'normal',
+          zIndex: idx
         });
       } else if (l.type === 'shape') {
         shapeLayers.push({
           id: l.id,
           shape: l.shape || 'square',
           color: l.color || '#4A6572',
-          x: Math.round(l.x),
-          y: Math.round(l.y),
-          width: Math.round(l.width),
-          height: Math.round(l.height),
+          x: l.x / w,
+          y: l.y / h,
+          width: l.width / w,
+          height: l.height / h,
           opacity: l.opacity !== undefined ? l.opacity : 1,
-          borderWidth: l.borderWidth || 0,
+          borderWidth: (l.borderWidth || 0) / w,
           borderColor: l.borderColor || '#000000',
-          rotation: l.rotation || 0
+          rotation: l.rotation || 0,
+          zIndex: idx
         });
       }
     });
@@ -1014,8 +1050,8 @@ function CreatorStudio() {
 
     const payload = {
       title: templateName,
-      category: templateCategory,
-      status: 'active',
+
+      status: isAutoSave ? 'draft' : 'active',
       width: canvasWidth,
       height: canvasHeight,
       background: {
@@ -1029,10 +1065,11 @@ function CreatorStudio() {
     };
 
     try {
-      const url = templateId 
-        ? `http://127.0.0.1:5001/api/templates/${templateId}` 
-        : 'http://127.0.0.1:5001/api/templates';
-      const method = templateId ? 'PUT' : 'POST';
+      const id = currentTemplateIdRef.current;
+      const url = id 
+        ? `${apiBase}/api/templates/${id}` 
+        : `${apiBase}/api/templates`;
+      const method = id ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method: method,
@@ -1040,15 +1077,37 @@ function CreatorStudio() {
         body: JSON.stringify(payload)
       });
       if (response.ok) {
-        alert(templateId ? 'Template Updated successfully!' : 'Template Saved to Database!');
-      } else {
+        const data = await response.json();
+        if (!id && data._id) {
+          currentTemplateIdRef.current = data._id;
+          setCurrentTemplateId(data._id);
+          window.history.replaceState(null, '', `?id=${data._id}`);
+        }
+        if (isAutoSave) {
+          setLastSaved(new Date());
+        } else {
+          alert(id ? 'Template Updated successfully!' : 'Template Saved to Database!');
+        }
+      } else if (!isAutoSave) {
         alert('Failed to save to database.');
       }
     } catch (err) {
       console.error(err);
-      alert('Error saving template.');
+      if (!isAutoSave) alert('Error saving template.');
     }
   };
+
+  // Auto-save effect
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    if (layers.length === 0 && backgroundType === 'color' && solidColor === '#FFFFFF') return;
+
+    const timer = setTimeout(() => {
+      handleSave(true);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [layers, background, solidColor, bgOpacity, backgroundType, templateName, autoSaveEnabled, canvasWidth, canvasHeight]);
 
   const getShapeBorderRadius = (layer: Layer | undefined) => {
     if (!layer) return '0';
@@ -1077,32 +1136,27 @@ function CreatorStudio() {
       {/* Left side: Properties & Layers panel */}
       <aside className="properties-sidebar" style={{ borderLeft: 'none', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ marginBottom: '20px' }}>
-          <Link href="/" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '15px' }}>
-            <ChevronLeft size={16} /> Back to Dashboard
-          </Link>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => router.back()} style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '15px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <ChevronLeft size={16} /> Go Back
+          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
              <input 
                value={templateName} 
                onChange={(e) => setTemplateName(e.target.value)}
                style={{ flex: 1, padding: '8px 12px', fontWeight: 'bold' }}
                placeholder="Template Name"
              />
-             <button className="btn btn-primary" onClick={handleSave} style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)' }}>Save</button>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+               <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                 <input type="checkbox" checked={autoSaveEnabled} onChange={(e) => setAutoSaveEnabled(e.target.checked)} />
+                 Auto-save to Draft
+               </label>
+               {lastSaved && <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Saved {lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
+             </div>
+             <button className="btn btn-primary" onClick={() => handleSave(false)} style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)' }}>Save</button>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <select
-                value={templateCategory}
-                onChange={(e) => setTemplateCategory(e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'white', fontSize: '13px', fontWeight: '500' }}
-              >
-                <option value="Traditional">Traditional</option>
-                <option value="Modern">Modern</option>
-                <option value="Floral">Floral</option>
-                <option value="Spiritual">Spiritual</option>
-                <option value="Classic">Classic</option>
-              </select>
-            </div>
+            <div style={{ flex: 1 }}></div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               <input 
                 type="checkbox" 
@@ -1126,7 +1180,7 @@ function CreatorStudio() {
             <Droppable droppableId="layers">
               {(provided) => (
                 <div {...provided.droppableProps} ref={provided.innerRef}>
-                  {layers.map((layer, index) => (
+                  {[...layers].reverse().map((layer, index) => (
                     <Draggable key={layer.id} draggableId={layer.id} index={index}>
                       {(provided) => (
                         <div
@@ -1146,6 +1200,15 @@ function CreatorStudio() {
                             </span>
                           </div>
                           <div style={{ display: 'flex', gap: '10px' }}>
+                            <span onClick={(e) => { e.stopPropagation(); updateLayer(layer.id, { locked: !layer.locked }); }} style={{ color: layer.locked ? '#EF4444' : 'var(--text-muted)', cursor: 'pointer' }} title={layer.locked ? "Unlock" : "Lock"}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                {layer.locked ? (
+                                  <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></>
+                                ) : (
+                                  <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></>
+                                )}
+                              </svg>
+                            </span>
                             <span onClick={(e) => toggleVisibility(layer.id, e)} style={{ color: layer.visible ? 'var(--text-secondary)' : 'var(--text-muted)', cursor: 'pointer' }}>
                               {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                             </span>
@@ -1162,6 +1225,24 @@ function CreatorStudio() {
               )}
             </Droppable>
           </DragDropContext>
+          {/* Static Background Layer */}
+          <div
+            className={`layer-item ${selectedLayerIds.includes('background') ? 'active' : ''}`}
+            onClick={(e) => handleLayerSelectToggle('background', e.shiftKey)}
+            style={{ background: 'var(--surface-color)', marginTop: '8px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+              <span style={{ marginRight: '8px', color: 'var(--text-muted)', opacity: 0.5 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </span>
+              <Wallpaper size={14} style={{ marginRight: '8px', color: 'var(--text-secondary)' }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
+                Background
+              </span>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -1242,7 +1323,7 @@ function CreatorStudio() {
           {backgroundType === 'image' && background && (
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-              background: `url("${background}") center/cover`,
+              background: `url("${background}") center/100% 100% no-repeat`,
               opacity: bgOpacity,
               pointerEvents: 'none'
             }} />
@@ -1256,7 +1337,9 @@ function CreatorStudio() {
           )}
           {[...layers].reverse().map((layer, idx) => {
             if (!layer.visible) return null;
-            const zIndex = idx + 1;
+            const isSelected = selectedLayerIds.includes(layer.id);
+            const baseZIndex = layers.length - idx;
+            const zIndex = baseZIndex; // Removed `1000 +` so selected layers stay in their correct z-index order
             const angleRad = ((layer.rotation || 0) * Math.PI) / 180;
             const cosAngle = Math.cos(angleRad);
             const sinAngle = Math.sin(angleRad);
@@ -1265,12 +1348,13 @@ function CreatorStudio() {
               <div
                 key={layer.id}
                 id={`parent-container-${layer.id}`}
+                className={layer.mixBlendMode === 'multiply' ? 'multiply-blend' : ''}
                 style={{
                   position: 'absolute',
                   left: layer.x * scale,
                   top: layer.y * scale,
                   width: layer.width * scale,
-                  height: layer.height * scale,
+                  height: layer.type === 'text' ? 'auto' : layer.height * scale,
                   transform: `rotate(${layer.rotation || 0}deg)`,
                   transformOrigin: '0 0',
                   zIndex,
@@ -1278,11 +1362,11 @@ function CreatorStudio() {
                 }}
               >
                 <Rnd
-                  size={{ width: '100%', height: '100%' }}
+                  size={{ width: '100%', height: layer.type === 'text' ? 'auto' : '100%' }}
                   position={{ x: 0, y: 0 }}
                   disableDragging={true}
                   dragGrid={snapToGrid ? [10 * scale, 10 * scale] : undefined}
-                  resizeGrid={snapToGrid ? [10 * scale, 10 * scale] : undefined}
+                  resizeGrid={snapToGrid && layer.type === 'shape' ? [10 * scale, 10 * scale] : undefined}
                   lockAspectRatio={layer.type !== 'shape'}
                   onResizeStop={(e, direction, ref, delta, position) => {
                     setIsDragging(false);
@@ -1302,8 +1386,9 @@ function CreatorStudio() {
                     };
 
                     if (layer.type === 'text') {
-                      const ratio = (layer.fontSize || 16) / layer.height;
-                      updates.fontSize = Math.round(newHeight * ratio);
+                      const scaleFactor = newWidth / layer.width;
+                      updates.fontSize = Math.round((layer.fontSize || 16) * scaleFactor);
+                      updates.height = ref.offsetHeight / scale;
                     }
 
                     if (layer.type === 'group' && layer.children) {
@@ -1329,10 +1414,10 @@ function CreatorStudio() {
                   onResize={(e, direction, ref, delta, position) => {
                     if (!isDragging) setIsDragging(true);
                     if (layer.type === 'text') {
-                      const newHeight = parseFloat(ref.style.height);
-                      if (newHeight) {
-                        const ratio = (layer.fontSize || 16) / layer.height;
-                        const newFontSizeCanvas = (newHeight / scale) * ratio;
+                      const newWidth = parseFloat(ref.style.width);
+                      if (newWidth) {
+                        const scaleFactor = newWidth / (layer.width * scale);
+                        const newFontSizeCanvas = (layer.fontSize || 16) * scaleFactor;
                         const textSpan = ref.querySelector('span');
                         if (textSpan) {
                           textSpan.style.fontSize = `${newFontSizeCanvas * scale}px`;
@@ -1340,7 +1425,7 @@ function CreatorStudio() {
                       }
                     }
                   }}
-                  enableResizing={activeLayerId === layer.id ? (layer.type === 'shape' ? { top:true, right:true, bottom:true, left:true, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true } : { top:false, right:false, bottom:false, left:false, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true }) : false}
+                  enableResizing={!layer.locked && activeLayerId === layer.id ? (layer.type === 'shape' ? { top:true, right:true, bottom:true, left:true, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true } : { top:false, right:false, bottom:false, left:false, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true }) : false}
                   resizeHandleStyles={activeLayerId === layer.id ? {
                     topLeft: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', left: '-5px', top: '-5px' },
                     topRight: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', right: '-5px', top: '-5px' },
@@ -1351,11 +1436,11 @@ function CreatorStudio() {
                     left: layer.type === 'shape' ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', left: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
                     right: layer.type === 'shape' ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', right: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
                   } : undefined}
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
                     setContextMenu(prev => ({ ...prev, visible: false }));
                   }}
-                  onContextMenu={(e) => {
+                  onContextMenu={(e: React.MouseEvent) => {
                     e.preventDefault();
                     e.stopPropagation();
                     if (!selectedLayerIds.includes(layer.id)) {
@@ -1374,7 +1459,8 @@ function CreatorStudio() {
                       ? '2px solid var(--accent-color)' 
                       : (selectedLayerIds.includes(layer.id) ? '2px dashed var(--accent-color)' : '2px solid transparent'),
                     opacity: layer.opacity !== undefined ? layer.opacity : 1,
-                    padding: 0
+                    padding: 0,
+                    mixBlendMode: (layer.mixBlendMode as React.CSSProperties['mixBlendMode']) || 'normal'
                   }}
                 >
                   {/* Canva-style rotation handle placed at the bottom center of the selection box */}
@@ -1444,18 +1530,28 @@ function CreatorStudio() {
                           fontFamily: (layer.fontFamily || 'Inter') + ', sans-serif',
                           fontWeight: layer.fontWeight || 'normal',
                           fontStyle: layer.fontStyle || 'normal',
-                          textShadow: layer.hasShadow ? `0px ${2 * scale}px ${layer.shadowBlur * scale}px ${layer.shadowColor || 'rgba(0,0,0,0.5)'}` : 'none',
+                          textShadow: (layer.shadowOffsetX || layer.shadowOffsetY || layer.shadowBlur) 
+                            ? `${layer.shadowOffsetX || 0}px ${layer.shadowOffsetY || 0}px ${layer.shadowBlur || 0}px ${layer.shadowColor || 'transparent'}` 
+                            : (layer.hasShadow ? `0px ${2 * scale}px ${(layer.shadowBlur || 4) * scale}px ${layer.shadowColor || 'rgba(0,0,0,0.5)'}` : 'none'),
+                          WebkitTextStroke: layer.outlineWidth ? `${layer.outlineWidth * scale}px ${layer.outlineColor || '#000000'}` : undefined,
+                          backgroundColor: layer.textBackgroundColor || 'transparent',
+                          padding: layer.textBackgroundColor ? `${10 * scale}px ${20 * scale}px` : '0',
+                          borderRadius: layer.textBackgroundColor ? `${8 * scale}px` : '0',
                           userSelect: editingLayerId === layer.id ? 'text' : 'none',
                           width: '100%',
                           height: '100%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: layer.alignment === 'left' ? 'flex-start' : (layer.alignment === 'right' ? 'flex-end' : 'center'),
-                          textAlign: layer.alignment || 'center',
-                          lineHeight: 1.2,
+                          textAlign: (layer.alignment as any) || 'center',
+                          lineHeight: layer.lineHeight !== undefined ? layer.lineHeight : 1.2,
+                          letterSpacing: layer.letterSpacing ? `${layer.letterSpacing * scale}px` : 'normal',
+                          textTransform: (layer.textTransform as 'none' | 'uppercase' | 'lowercase' | 'capitalize') || 'none',
                           whiteSpace: 'normal',
                           wordBreak: 'break-word',
-                          outline: 'none'
+                          outline: 'none',
+                          textDecoration: layer.textDecoration || 'none',
+                          flexShrink: 0
                         }}
                       >
                         {layer.content}
@@ -1471,7 +1567,9 @@ function CreatorStudio() {
                             style={{ 
                               width: '100%', 
                               height: '100%', 
-                              objectFit: 'cover', 
+                              objectFit: 'cover',
+                              transform: `scale(${layer.imageScale || 1}) translate(${layer.imageOffsetX || 0}px, ${layer.imageOffsetY || 0}px)`,
+                              transformOrigin: 'center center',
                               pointerEvents: 'none'
                             }} 
                           />
@@ -1490,7 +1588,8 @@ function CreatorStudio() {
                           width: '100%', 
                           height: '100%', 
                           objectFit: 'fill', 
-                          pointerEvents: 'none'
+                          pointerEvents: 'none',
+                          mixBlendMode: (layer.mixBlendMode as React.CSSProperties['mixBlendMode']) || 'normal'
                         }} 
                       />
                     )}
@@ -1530,7 +1629,7 @@ function CreatorStudio() {
                                   fontWeight: child.fontWeight || 'normal',
                                   fontStyle: child.fontStyle || 'normal',
                                   textDecoration: child.textDecoration || 'none',
-                                  textShadow: child.hasShadow ? `0px ${2 * scale}px ${child.shadowBlur * scale}px ${child.shadowColor || 'rgba(0,0,0,0.5)'}` : 'none',
+                                  textShadow: child.hasShadow ? `0px ${2 * scale}px ${(child.shadowBlur || 4) * scale}px ${child.shadowColor || 'rgba(0,0,0,0.5)'}` : 'none',
                                   lineHeight: 1.2,
                                   whiteSpace: 'nowrap'
                                 }}>
@@ -1629,6 +1728,16 @@ function CreatorStudio() {
               cursor: 'pointer'
             }}
           >Graphics</button>
+          <button 
+            type="button"
+            onClick={() => { setRightSidebarTab('flowers'); setElementSubPanel('main'); }}
+            style={{
+              flex: 1, padding: '12px 0', border: 'none', background: 'none', fontSize: '12px', fontWeight: 'bold',
+              color: rightSidebarTab === 'flowers' ? 'var(--accent-color)' : 'var(--text-secondary)',
+              borderBottom: rightSidebarTab === 'flowers' ? '2px solid var(--accent-color)' : 'none',
+              cursor: 'pointer'
+            }}
+          >Flowers</button>
         </div>
 
         {/* Tab 1: Elements */}
@@ -2046,6 +2155,62 @@ function CreatorStudio() {
           </div>
         )}
 
+        {/* Tab 4: Flowers */}
+        {rightSidebarTab === 'flowers' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
+            <h2 style={{ fontSize: '16px', marginBottom: '8px', fontWeight: 'bold' }}>Floral Designs</h2>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '15px' }}>Click to insert beautiful floral overlays.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', overflowY: 'auto', paddingRight: '5px', flex: 1, maxHeight: '350px' }}>
+              {[
+                { id: 'floral_white_roses', name: 'White Roses' },
+                { id: 'floral_gold_leaves', name: 'Gold Leaves' },
+                { id: 'floral_cherry_blossom', name: 'Cherry Blossom' },
+                { id: 'floral_forget_me_not', name: 'Forget-me-not' },
+                { id: 'floral_olive_branch', name: 'Olive Branch' },
+                { id: 'floral_lavender', name: 'Lavender' },
+                { id: 'floral_lilies_frame', name: 'Lilies Frame' },
+                { id: 'floral_peonies', name: 'Peonies' },
+                { id: 'floral_ferns_corner', name: 'Ferns Corner' },
+                { id: 'floral_daisy_divider', name: 'Daisy Divider' },
+                { id: 'original_golden_floral', name: 'Golden Floral' },
+                { id: 'original_classic_ivory', name: 'Classic Ivory' },
+                { id: 'original_dark_moody', name: 'Dark Moody' },
+                { id: 'original_subtle_corner', name: 'Subtle Corner' },
+                { id: 'original_elegant_geometric', name: 'Elegant Geometric' },
+                { id: 'original_blue_hydrangea', name: 'Blue Hydrangea' },
+                { id: 'original_soft_blush', name: 'Soft Blush' },
+                { id: 'original_vintage_sepia', name: 'Vintage Sepia' },
+                { id: 'original_white_orchid', name: 'White Orchid' },
+                { id: 'original_peace_lily', name: 'Peace Lily' },
+              ].map(flower => (
+                <button
+                  key={flower.id}
+                  type="button"
+                  className="aspect-ratio-card"
+                  style={{ padding: '0', height: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+                  onClick={() => {
+                    setLayers([...layers, { 
+                      id: Date.now().toString(), 
+                      type: 'image', 
+                      src: `/flowers/${flower.id}.png`, 
+                      x: 100, y: 100, 
+                      width: 400, height: 400, 
+                      visible: true, 
+                      rotation: 0,
+                      mixBlendMode: 'multiply' 
+                    }]);
+                  }}
+                >
+                  <img src={`/flowers/${flower.id}.png`} alt={flower.name} style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.9)', padding: '4px', fontSize: '10px', fontWeight: 'bold', textAlign: 'center', borderTop: '1px solid var(--border-color)' }}>
+                    {flower.name}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* File inputs */}
         <input type="file" ref={overlayInputRef} style={{ display: 'none' }} accept="image/*" 
           onChange={async (e) => {
@@ -2207,28 +2372,89 @@ function CreatorStudio() {
                 />
               </div>
 
-              <div className="input-group">
+              <div className="input-group" style={{ position: 'relative' }}>
                 <label>Font Family</label>
-                <select 
-                  value={activeLayer.fontFamily || 'Inter'} 
-                  onChange={(e) => updateLayer(activeLayer.id, { fontFamily: e.target.value })}
-                  style={{ fontFamily: activeLayer.fontFamily || 'Inter' }}
+                <div 
+                  onClick={() => setShowFontDropdown(!showFontDropdown)}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--surface-color)',
+                    cursor: 'pointer',
+                    fontFamily: activeLayer.fontFamily || 'Inter',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '14px'
+                  }}
                 >
-                  {GOOGLE_FONTS_LIBRARY.map(font => (
-                    <option key={font} value={font} style={{ fontFamily: font }}>
-                      {font}
-                    </option>
-                  ))}
-                </select>
+                  {activeLayer.fontFamily || 'Inter'}
+                  <span style={{ fontSize: '10px' }}>▼</span>
+                </div>
+                {showFontDropdown && (
+                  <>
+                    <div 
+                      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }} 
+                      onClick={() => setShowFontDropdown(false)} 
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      maxHeight: '250px',
+                      overflowY: 'auto',
+                      background: 'var(--surface-color)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-sm)',
+                      zIndex: 100,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      marginTop: '4px'
+                    }}>
+                      {GOOGLE_FONTS_LIBRARY.map(font => (
+                        <div 
+                          key={font}
+                          onClick={() => {
+                            updateLayer(activeLayer.id, { fontFamily: font });
+                            setShowFontDropdown(false);
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            cursor: 'pointer',
+                            fontFamily: font,
+                            fontSize: '16px',
+                            backgroundColor: (activeLayer.fontFamily || 'Inter') === font ? 'var(--accent-color)' : 'transparent',
+                            color: (activeLayer.fontFamily || 'Inter') === font ? 'white' : 'var(--text-color)',
+                            borderBottom: '1px solid var(--border-color)'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = (activeLayer.fontFamily || 'Inter') === font ? 'var(--accent-color)' : 'rgba(0,0,0,0.05)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = (activeLayer.fontFamily || 'Inter') === font ? 'var(--accent-color)' : 'transparent'}
+                        >
+                          {font}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="input-group">
                 <label>Font Size</label>
-                <input 
-                  type="number" 
-                  value={activeLayer.fontSize || 16} 
-                  onChange={(e) => updateLayer(activeLayer.id, { fontSize: Number(e.target.value) })}
-                />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input 
+                    type="range" min="10" max="300" step="1"
+                    value={activeLayer.fontSize || 16} 
+                    onChange={(e) => updateLayer(activeLayer.id, { fontSize: Number(e.target.value) })}
+                    style={{ flex: 1, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                  />
+                  <input 
+                    type="number" 
+                    value={activeLayer.fontSize || 16} 
+                    onChange={(e) => updateLayer(activeLayer.id, { fontSize: Number(e.target.value) })}
+                    style={{ width: '70px', textAlign: 'center' }}
+                  />
+                </div>
               </div>
 
               <div className="input-group">
@@ -2262,6 +2488,53 @@ function CreatorStudio() {
                 </div>
               </div>
 
+              <div className="input-group">
+                <label>Letter Case</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    className="btn" 
+                    style={{ flex: 1, padding: '8px', fontWeight: 'bold', background: activeLayer.textTransform === 'uppercase' ? 'var(--accent-color)' : 'var(--bg-color)', color: activeLayer.textTransform === 'uppercase' ? 'white' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                    onClick={() => updateLayer(activeLayer.id, { textTransform: activeLayer.textTransform === 'uppercase' ? 'none' : 'uppercase' })}
+                  >AA</button>
+                  <button 
+                    className="btn" 
+                    style={{ flex: 1, padding: '8px', fontWeight: 'bold', background: activeLayer.textTransform === 'lowercase' ? 'var(--accent-color)' : 'var(--bg-color)', color: activeLayer.textTransform === 'lowercase' ? 'white' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                    onClick={() => updateLayer(activeLayer.id, { textTransform: activeLayer.textTransform === 'lowercase' ? 'none' : 'lowercase' })}
+                  >aa</button>
+                  <button 
+                    className="btn" 
+                    style={{ flex: 1, padding: '8px', fontWeight: 'bold', background: activeLayer.textTransform === 'capitalize' ? 'var(--accent-color)' : 'var(--bg-color)', color: activeLayer.textTransform === 'capitalize' ? 'white' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                    onClick={() => updateLayer(activeLayer.id, { textTransform: activeLayer.textTransform === 'capitalize' ? 'none' : 'capitalize' })}
+                  >Aa</button>
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label>Spacing</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                    <span>Letter Spacing</span>
+                    <span>{activeLayer.letterSpacing || 0}</span>
+                  </div>
+                  <input 
+                    type="range" min="-10" max="100" step="1"
+                    value={activeLayer.letterSpacing || 0} 
+                    onChange={(e) => updateLayer(activeLayer.id, { letterSpacing: Number(e.target.value) })}
+                    style={{ width: '100%', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    <span>Line Height</span>
+                    <span>{activeLayer.lineHeight !== undefined ? activeLayer.lineHeight : 1.2}</span>
+                  </div>
+                  <input 
+                    type="range" min="0.5" max="3" step="0.1"
+                    value={activeLayer.lineHeight !== undefined ? activeLayer.lineHeight : 1.2} 
+                    onChange={(e) => updateLayer(activeLayer.id, { lineHeight: Number(e.target.value) })}
+                    style={{ width: '100%', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                  />
+                </div>
+              </div>
+
               {/* Opacity Slider */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
@@ -2275,6 +2548,241 @@ function CreatorStudio() {
                   style={{ width: '100%', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
                 />
               </div>
+
+              <div style={{ height: '1px', background: 'var(--border-color)', margin: '20px 0' }} />
+              
+              {activeTextEffect === null ? (
+                <button 
+                  className="btn" 
+                  style={{ width: '100%', background: 'var(--accent-color)', color: 'white', fontWeight: 'bold', padding: '10px' }} 
+                  onClick={() => setActiveTextEffect('menu')}
+                >
+                  Effects <span>›</span>
+                </button>
+              ) : activeTextEffect === 'menu' ? (
+                <>
+                  <button className="btn" style={{ marginBottom: '16px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '6px 12px' }} onClick={() => setActiveTextEffect(null)}>
+                    ‹ Back
+                  </button>
+                  <h3 style={{ fontSize: '14px', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Effects Menu</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button className="btn" style={{ justifyContent: 'space-between', background: 'var(--bg-color)', border: '1px solid var(--border-color)', padding: '12px 16px' }} onClick={() => setActiveTextEffect('shadow')}>
+                      Drop Shadow <span>›</span>
+                    </button>
+                    <button className="btn" style={{ justifyContent: 'space-between', background: 'var(--bg-color)', border: '1px solid var(--border-color)', padding: '12px 16px' }} onClick={() => setActiveTextEffect('outline')}>
+                      Outline <span>›</span>
+                    </button>
+                    <button className="btn" style={{ justifyContent: 'space-between', background: 'var(--bg-color)', border: '1px solid var(--border-color)', padding: '12px 16px' }} onClick={() => setActiveTextEffect('background')}>
+                      Background Highlight <span>›</span>
+                    </button>
+                    <button className="btn" style={{ justifyContent: 'space-between', background: 'var(--bg-color)', border: '1px solid var(--border-color)', padding: '12px 16px' }} onClick={() => setActiveTextEffect('glow')}>
+                      Glow <span>›</span>
+                    </button>
+                    <button className="btn" style={{ justifyContent: 'space-between', background: 'var(--bg-color)', border: '1px solid var(--border-color)', padding: '12px 16px' }} onClick={() => setActiveTextEffect('echo')}>
+                      Echo <span>›</span>
+                    </button>
+                  </div>
+                </>
+              ) : activeTextEffect === 'glow' ? (
+                <>
+                  <button className="btn" style={{ marginBottom: '16px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '6px 12px' }} onClick={() => setActiveTextEffect('menu')}>
+                    ‹ Back
+                  </button>
+                  <h3 style={{ fontSize: '14px', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Glow</h3>
+                  <div className="input-group">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flex: 1, gap: '8px', alignItems: 'center' }}>
+                          <input 
+                            type="range" min="0" max="50" step="1"
+                            value={activeLayer.shadowBlur || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowBlur: Number(e.target.value), shadowOffsetX: 0, shadowOffsetY: 0 })}
+                            style={{ flex: 1, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                          />
+                          <input 
+                            type="number" placeholder="Intensity"
+                            value={activeLayer.shadowBlur || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowBlur: Number(e.target.value), shadowOffsetX: 0, shadowOffsetY: 0 })}
+                            style={{ width: '60px', textAlign: 'center' }}
+                          />
+                        </div>
+                        <input 
+                          type="color" 
+                          value={activeLayer.shadowColor || '#000000'} 
+                          onChange={(e) => updateLayer(activeLayer.id, { shadowColor: e.target.value, shadowOffsetX: 0, shadowOffsetY: 0 })}
+                          style={{ flex: 1, padding: '0', height: '36px', cursor: 'pointer' }}
+                        />
+                      </div>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ marginTop: '8px' }}
+                        onClick={() => updateLayer(activeLayer.id, { shadowOffsetX: 0, shadowOffsetY: 0, shadowBlur: 0, shadowColor: 'transparent' })}
+                      >Remove Glow</button>
+                    </div>
+                  </div>
+                </>
+              ) : activeTextEffect === 'echo' ? (
+                <>
+                  <button className="btn" style={{ marginBottom: '16px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '6px 12px' }} onClick={() => setActiveTextEffect('menu')}>
+                    ‹ Back
+                  </button>
+                  <h3 style={{ fontSize: '14px', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Echo</h3>
+                  <div className="input-group">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', flex: 1, gap: '8px', alignItems: 'center' }}>
+                          <input 
+                            type="range" min="-50" max="50" step="1"
+                            value={activeLayer.shadowOffsetX || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowOffsetX: Number(e.target.value), shadowOffsetY: Number(e.target.value), shadowBlur: 0 })}
+                            style={{ flex: 1, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                          />
+                          <input 
+                            type="number" placeholder="Offset"
+                            value={activeLayer.shadowOffsetX || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowOffsetX: Number(e.target.value), shadowOffsetY: Number(e.target.value), shadowBlur: 0 })}
+                            style={{ width: '60px', textAlign: 'center' }}
+                          />
+                        </div>
+                        <input 
+                          type="color" 
+                          value={activeLayer.shadowColor || '#000000'} 
+                          onChange={(e) => updateLayer(activeLayer.id, { shadowColor: e.target.value, shadowBlur: 0 })}
+                          style={{ flex: 1, padding: '0', height: '36px', cursor: 'pointer' }}
+                        />
+                      </div>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ marginTop: '8px' }}
+                        onClick={() => updateLayer(activeLayer.id, { shadowOffsetX: 0, shadowOffsetY: 0, shadowBlur: 0, shadowColor: 'transparent' })}
+                      >Remove Echo</button>
+                    </div>
+                  </div>
+                </>
+              ) : activeTextEffect === 'shadow' ? (
+                <>
+                  <button className="btn" style={{ marginBottom: '16px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '6px 12px' }} onClick={() => setActiveTextEffect('menu')}>
+                    ‹ Back
+                  </button>
+                  <h3 style={{ fontSize: '14px', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Drop Shadow</h3>
+                  <div className="input-group">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', width: '20px' }}>X</span>
+                          <input 
+                            type="range" min="-50" max="50" step="1"
+                            value={activeLayer.shadowOffsetX || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowOffsetX: Number(e.target.value) })}
+                            style={{ flex: 1, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                          />
+                          <input 
+                            type="number"
+                            value={activeLayer.shadowOffsetX || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowOffsetX: Number(e.target.value) })}
+                            style={{ width: '50px', textAlign: 'center' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', width: '20px' }}>Y</span>
+                          <input 
+                            type="range" min="-50" max="50" step="1"
+                            value={activeLayer.shadowOffsetY || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowOffsetY: Number(e.target.value) })}
+                            style={{ flex: 1, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                          />
+                          <input 
+                            type="number"
+                            value={activeLayer.shadowOffsetY || 0} 
+                            onChange={(e) => updateLayer(activeLayer.id, { shadowOffsetY: Number(e.target.value) })}
+                            style={{ width: '50px', textAlign: 'center' }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', width: '20px' }}>Blur</span>
+                        <input 
+                          type="range" min="0" max="50" step="1"
+                          value={activeLayer.shadowBlur || 0} 
+                          onChange={(e) => updateLayer(activeLayer.id, { shadowBlur: Number(e.target.value) })}
+                          style={{ flex: 1, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                        />
+                        <input 
+                          type="number"
+                          value={activeLayer.shadowBlur || 0} 
+                          onChange={(e) => updateLayer(activeLayer.id, { shadowBlur: Number(e.target.value) })}
+                          style={{ width: '50px', textAlign: 'center' }}
+                        />
+                        <input 
+                          type="color" 
+                          value={activeLayer.shadowColor || '#000000'} 
+                          onChange={(e) => updateLayer(activeLayer.id, { shadowColor: e.target.value })}
+                          style={{ flex: 1, padding: '0', height: '36px', cursor: 'pointer' }}
+                        />
+                      </div>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ marginTop: '8px' }}
+                        onClick={() => updateLayer(activeLayer.id, { shadowOffsetX: 0, shadowOffsetY: 0, shadowBlur: 0, shadowColor: 'transparent' })}
+                      >Remove Shadow</button>
+                    </div>
+                  </div>
+                </>
+              ) : activeTextEffect === 'outline' ? (
+                <>
+                  <button className="btn" style={{ marginBottom: '16px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '6px 12px' }} onClick={() => setActiveTextEffect('menu')}>
+                    ‹ Back
+                  </button>
+                  <h3 style={{ fontSize: '14px', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Outline</h3>
+                  <div className="input-group">
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flex: 1, gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          type="range" min="0" max="20" step="1"
+                          value={activeLayer.outlineWidth || 0} 
+                          onChange={(e) => updateLayer(activeLayer.id, { outlineWidth: Number(e.target.value) })}
+                          style={{ flex: 1, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                        />
+                        <input 
+                          type="number" placeholder="Width"
+                          value={activeLayer.outlineWidth || 0} 
+                          onChange={(e) => updateLayer(activeLayer.id, { outlineWidth: Number(e.target.value) })}
+                          style={{ width: '50px', textAlign: 'center' }}
+                        />
+                      </div>
+                      <input 
+                        type="color" 
+                        value={activeLayer.outlineColor || '#000000'} 
+                        onChange={(e) => updateLayer(activeLayer.id, { outlineColor: e.target.value })}
+                        style={{ flex: 1, padding: '0', height: '36px', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : activeTextEffect === 'background' ? (
+                <>
+                  <button className="btn" style={{ marginBottom: '16px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '6px 12px' }} onClick={() => setActiveTextEffect('menu')}>
+                    ‹ Back
+                  </button>
+                  <h3 style={{ fontSize: '14px', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Background Highlight</h3>
+                  <div className="input-group">
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input 
+                        type="color" 
+                        value={activeLayer.textBackgroundColor || '#FFFFFF'} 
+                        onChange={(e) => updateLayer(activeLayer.id, { textBackgroundColor: e.target.value })}
+                        style={{ flex: 1, padding: '0', height: '36px', cursor: 'pointer' }}
+                      />
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                        onClick={() => updateLayer(activeLayer.id, { textBackgroundColor: undefined })}
+                      >Clear</button>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
             </div>
           )}
 
@@ -2328,12 +2836,67 @@ function CreatorStudio() {
                     fileInput.click();
                   }}
                 >
-                  <FileImage size={16} /> Choose Photo
+                  <FileImage size={16} /> Upload New Photo
                 </button>
               </div>
 
+              {activeLayer.src && (
+                <>
+                  <div style={{ height: '1px', background: 'var(--border-color)', margin: '16px 0' }} />
+                  <h4 style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>Image Position</h4>
+                  
+                  {/* Zoom Slider */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                      <span>Zoom</span>
+                      <span>{Math.round((activeLayer.imageScale || 1) * 100)}%</span>
+                    </div>
+                    <input 
+                      type="range" min="1" max="3" step="0.05"
+                      value={activeLayer.imageScale || 1} 
+                      onChange={(e) => updateLayer(activeLayer.id, { imageScale: parseFloat(e.target.value) })}
+                      style={{ width: '100%', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                    />
+                  </div>
+
+                  {/* Horizontal / Vertical Pan */}
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        <span>Horizontal</span>
+                      </div>
+                      <input 
+                        type="range" min="-150" max="150" step="1"
+                        value={activeLayer.imageOffsetX || 0} 
+                        onChange={(e) => updateLayer(activeLayer.id, { imageOffsetX: parseInt(e.target.value) })}
+                        style={{ width: '100%', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                      />
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        <span>Vertical</span>
+                      </div>
+                      <input 
+                        type="range" min="-150" max="150" step="1"
+                        value={activeLayer.imageOffsetY || 0} 
+                        onChange={(e) => updateLayer(activeLayer.id, { imageOffsetY: parseInt(e.target.value) })}
+                        style={{ width: '100%', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => updateLayer(activeLayer.id, { imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 })}
+                    style={{ width: '100%', fontSize: '11px', padding: '6px' }}
+                  >
+                    Reset Position
+                  </button>
+                </>
+              )}
+
               {/* Opacity Slider */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', marginTop: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
                   <span>Opacity</span>
                   <span>{Math.round((activeLayer.opacity !== undefined ? activeLayer.opacity : 1) * 100)}%</span>
@@ -2431,9 +2994,20 @@ function CreatorStudio() {
               {/* Tab Body: Gradient */}
               {shapeFillType === 'gradient' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+                  <div className="input-group" style={{ marginBottom: '15px' }}>
+                    <label>Gradient Style</label>
+                    <select 
+                      value={shapeGradientType}
+                      onChange={(e) => handleShapeGradientChange(shapeColor1, shapeColor2, shapeAngle, e.target.value as 'two-color' | 'transparent')}
+                    >
+                      <option value="two-color">Two Colors</option>
+                      <option value="transparent">Fade to Transparent</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: shapeGradientType === 'transparent' ? '1fr' : '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
                     <div className="input-group" style={{ margin: 0 }}>
-                      <label>Color 1</label>
+                      <label>{shapeGradientType === 'transparent' ? 'Color' : 'Color 1'}</label>
                       <input 
                         type="color" 
                         value={shapeColor1} 
@@ -2441,15 +3015,17 @@ function CreatorStudio() {
                         style={{ padding: '0', height: '40px', cursor: 'pointer' }}
                       />
                     </div>
-                    <div className="input-group" style={{ margin: 0 }}>
-                      <label>Color 2</label>
-                      <input 
-                        type="color" 
-                        value={shapeColor2} 
-                        onChange={(e) => handleShapeGradientChange(shapeColor1, e.target.value, shapeAngle)}
-                        style={{ padding: '0', height: '40px', cursor: 'pointer' }}
-                      />
-                    </div>
+                    {shapeGradientType === 'two-color' && (
+                      <div className="input-group" style={{ margin: 0 }}>
+                        <label>Color 2</label>
+                        <input 
+                          type="color" 
+                          value={shapeColor2} 
+                          onChange={(e) => handleShapeGradientChange(shapeColor1, e.target.value, shapeAngle)}
+                          style={{ padding: '0', height: '40px', cursor: 'pointer' }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Angle Slider */}

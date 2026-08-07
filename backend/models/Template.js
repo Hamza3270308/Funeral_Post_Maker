@@ -18,11 +18,28 @@ const TextLayerSchema = new Schema({
   fontWeight: { type: String, default: 'normal' },
   fontStyle: { type: String, default: 'normal' },
   textDecoration: { type: String, default: 'none' },
+  textTransform: { type: String, default: 'none' },
   opacity: { type: Number, default: 1 },
   rotation: { type: Number, default: 0 },
   hasShadow: { type: Boolean, default: false },
   shadowColor: { type: String, default: 'rgba(0,0,0,0.5)' },
-  shadowBlur: { type: Number, default: 4 }
+  shadowBlur: { type: Number, default: 4 },
+  shadowOffsetX: { type: Number, default: 0 },
+  shadowOffsetY: { type: Number, default: 0 },
+  glowBlur: { type: Number, default: 0 },
+  glowColor: { type: String, default: '' },
+  echoOffsetX: { type: Number, default: 0 },
+  echoOffsetY: { type: Number, default: 0 },
+  echoColor: { type: String, default: '' },
+  neonIntensity: { type: Number, default: 0 },
+  neonColor: { type: String, default: '' },
+  curveIntensity: { type: Number, default: 0 },
+  textBackgroundColor: { type: String, default: '' },
+  outlineWidth: { type: Number, default: 0 },
+  outlineColor: { type: String, default: '#000000' },
+  lineHeight: { type: Number, default: 1.2 },
+  letterSpacing: { type: Number, default: 0 },
+  zIndex: { type: Number }
 }, { _id: false });
 
 const ImageLayerSchema = new Schema({
@@ -38,7 +55,17 @@ const ImageLayerSchema = new Schema({
   // Styling extensions
   opacity: { type: Number, default: 1 },
   borderWidth: { type: Number, default: 0 },
-  borderColor: { type: String, default: '#000000' }
+  borderColor: { type: String, default: '#000000' },
+  borderStyle: { type: String, default: 'solid' },
+  borderRadius: { type: Number, default: 0 },
+  flipX: { type: Boolean, default: false },
+  flipY: { type: Boolean, default: false },
+  mixBlendMode: { type: String, default: 'normal' },
+  lockAspectRatio: { type: Boolean, default: true },
+  imageScale: { type: Number, default: 1 },
+  imageOffsetX: { type: Number, default: 0 },
+  imageOffsetY: { type: Number, default: 0 },
+  zIndex: { type: Number }
 }, { _id: false });
 
 const ShapeLayerSchema = new Schema({
@@ -53,12 +80,16 @@ const ShapeLayerSchema = new Schema({
   opacity: { type: Number, default: 1 },
   borderWidth: { type: Number, default: 0 },
   borderColor: { type: String, default: '#000000' },
-  rotation: { type: Number, default: 0 }
+  borderStyle: { type: String, default: 'solid' },
+  borderRadius: { type: Number, default: 0 },
+  flipX: { type: Boolean, default: false },
+  flipY: { type: Boolean, default: false },
+  rotation: { type: Number, default: 0 },
+  zIndex: { type: Number }
 }, { _id: false });
 
 const TemplateSchema = new Schema({
   title: { type: String, required: true },
-  category: { type: String, required: true },
   status: { type: String, enum: ['draft', 'active'], default: 'draft' },
   
   // Background layer properties

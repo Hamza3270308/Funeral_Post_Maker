@@ -1,4 +1,4 @@
-package com.funeralpostmaker.mobile
+package com.hamitech.funeralpostmaker
 
 import io.flutter.embedding.android.FlutterActivity
 

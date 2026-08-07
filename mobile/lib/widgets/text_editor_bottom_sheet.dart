@@ -9,11 +9,11 @@ class TextEditorBottomSheet extends StatefulWidget {
   final Function(TextLayer) onLayerUpdated;
 
   const TextEditorBottomSheet({
-    Key? key,
+    super.key,
     required this.initialLayer,
     required this.googleFontsLibrary,
     required this.onLayerUpdated,
-  }) : super(key: key);
+  });
 
   @override
   State<TextEditorBottomSheet> createState() => _TextEditorBottomSheetState();
@@ -84,10 +84,10 @@ class _TextEditorBottomSheetState extends State<TextEditorBottomSheet> {
             children: [
               const Text(
                 'Edit Text Style',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                icon: const Icon(Icons.close, color: AppTheme.textGray),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -95,11 +95,11 @@ class _TextEditorBottomSheetState extends State<TextEditorBottomSheet> {
           const SizedBox(height: 16),
           
           // Font Family Dropdown
-          const Text('Font Family', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+          const Text('Font Family', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textGray)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.font_download_outlined, color: AppTheme.textSecondary),
+              prefixIcon: Icon(Icons.font_download_outlined, color: AppTheme.textGray),
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
             value: widget.googleFontsLibrary.contains(_layer.fontFamily) ? _layer.fontFamily : 'Inter',
@@ -129,7 +129,7 @@ class _TextEditorBottomSheetState extends State<TextEditorBottomSheet> {
           const SizedBox(height: 24),
 
           // Style Toggles
-          const Text('Text Style', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+          const Text('Text Style', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textGray)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -173,7 +173,7 @@ class _TextEditorBottomSheetState extends State<TextEditorBottomSheet> {
           const SizedBox(height: 24),
 
           // Color Palette
-          const Text('Text Color', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+          const Text('Text Color', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textGray)),
           const SizedBox(height: 8),
           SizedBox(
             height: 40,
@@ -195,11 +195,11 @@ class _TextEditorBottomSheetState extends State<TextEditorBottomSheet> {
                       color: color,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isSelected ? AppTheme.terracotta : Colors.grey.shade300,
+                        color: isSelected ? AppTheme.accentNeon : Colors.grey.shade300,
                         width: isSelected ? 3 : 1,
                       ),
                       boxShadow: isSelected ? [
-                        BoxShadow(color: AppTheme.terracotta.withOpacity(0.3), blurRadius: 8)
+                        BoxShadow(color: AppTheme.accentNeon.withOpacity(0.3), blurRadius: 8)
                       ] : null,
                     ),
                   ),
@@ -219,11 +219,11 @@ class _TextEditorBottomSheetState extends State<TextEditorBottomSheet> {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.terracotta.withOpacity(0.1) : Colors.transparent,
-          border: Border.all(color: isActive ? AppTheme.terracotta : AppTheme.borderSoft),
+          color: isActive ? AppTheme.accentNeon.withOpacity(0.1) : Colors.transparent,
+          border: Border.all(color: isActive ? AppTheme.accentNeon : AppTheme.borderSoft),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(icon, color: isActive ? AppTheme.terracotta : AppTheme.textSecondary),
+        child: Icon(icon, color: isActive ? AppTheme.accentNeon : AppTheme.textGray),
       ),
     );
   }
@@ -237,7 +237,7 @@ class _TextEditorBottomSheetState extends State<TextEditorBottomSheet> {
           color: isActive ? Colors.grey.shade200 : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),
-        child: Icon(icon, size: 20, color: isActive ? AppTheme.textPrimary : AppTheme.textSecondary),
+        child: Icon(icon, size: 20, color: isActive ? AppTheme.textDark : AppTheme.textGray),
       ),
     );
   }

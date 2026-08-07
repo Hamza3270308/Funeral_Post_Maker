@@ -22,6 +22,9 @@ app.use(express.json());
 // Serve static files from the uploads directory (for backgrounds, fonts, stickers)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve floral overlay assets from the backend's public/flowers folder
+app.use('/flowers', express.static(path.join(__dirname, 'public/flowers')));
+
 // API Routes
 app.use('/api/templates', require('./routes/templateRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
@@ -33,7 +36,7 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/funeral_po
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    app.listen(PORT, '127.0.0.1', () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
     });
   })

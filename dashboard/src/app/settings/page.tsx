@@ -35,7 +35,7 @@ export default function SettingsPage() {
   });
   const [backendUrl, setBackendUrl] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('settings_backend_url') || 'http://127.0.0.1:5001';
+      return localStorage.getItem('settings_backend_url') || `http://${window.location.hostname}:5001`;
     }
     return 'http://127.0.0.1:5001';
   });
@@ -55,8 +55,8 @@ export default function SettingsPage() {
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
 
   useEffect(() => {
-    // Check backend health
-    fetch('http://127.0.0.1:5001/api/templates/admin')
+    const apiBase = '';
+    fetch(`${apiBase}/api/templates/admin`)
       .then((res) => {
         if (res.ok) setDbStatus('connected');
         else setDbStatus('error');
@@ -222,10 +222,10 @@ export default function SettingsPage() {
               <div className="input-group" style={{ margin: 0 }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>Backend API Endpoint URL</label>
                 <input 
-                  type="url" 
-                  value={backendUrl} 
+                  type="text"
+                  placeholder="http://localhost:5001"
+                  value={backendUrl}
                   onChange={(e) => setBackendUrl(e.target.value)}
-                  placeholder="http://127.0.0.1:5001"
                   required
                 />
               </div>

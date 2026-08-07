@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'theme/theme.dart';
-import 'screens/onboarding_screen.dart';
+import 'screens/splash_screen.dart';
 
-void main() {
+import 'package:firebase_core/firebase_core.dart';
+import 'services/user_settings_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  await UserSettingsService.instance.init();
   runApp(const MyApp());
 }
 
@@ -12,10 +18,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Tribute Post Maker',
+      title: 'Funeral Post Maker',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      home: const OnboardingScreen(),
+      home: const SplashScreen(),
     );
   }
 }

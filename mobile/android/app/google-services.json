@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "19528064541",
+    "project_id": "hamitech-f1994",
+    "storage_bucket": "hamitech-f1994.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:19528064541:android:2b01de6366f8eab0b6f0f4",
+        "android_client_info": {
+          "package_name": "com.hamitech.funeralpostmaker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhQJq9JD2IXLJlHzAkGE84muwVk4XYO4I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

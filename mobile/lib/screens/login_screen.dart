@@ -45,13 +45,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: 90,
                 height: 90,
                 decoration: BoxDecoration(
-                  color: AppTheme.terracotta.withOpacity(0.1),
+                  color: AppTheme.accentNeon.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.auto_awesome_mosaic_rounded,
                   size: 44,
-                  color: AppTheme.terracotta,
+                  color: AppTheme.accentNeon,
                 ),
               ),
               const SizedBox(height: 24),
@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Honoring lives with beautiful tributes',
                 style: TextStyle(
                   fontSize: 15,
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textGray,
                 ),
               ),
               const SizedBox(height: 64),
@@ -77,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.sunlitCream.withOpacity(0.3),
+                  color: AppTheme.lightSurface.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppTheme.borderSoft),
                 ),
@@ -86,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Icon(
                       Icons.info_outline_rounded,
-                      color: AppTheme.terracotta,
+                      color: AppTheme.accentNeon,
                       size: 24,
                     ),
                     SizedBox(width: 12),
@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: AppTheme.walnutBrown,
+                              color: AppTheme.textDark,
                             ),
                           ),
                           SizedBox(height: 4),
@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             'To save your customized designs and access them securely, Google Sign-In is required.',
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppTheme.textSecondary,
+                              color: AppTheme.textGray,
                               height: 1.4,
                             ),
                           ),
@@ -121,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
               
               // Google Sign-In button
               _isLoading
-                  ? const CircularProgressIndicator(color: AppTheme.terracotta)
+                  ? const CircularProgressIndicator(color: AppTheme.accentNeon)
                   : SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
@@ -139,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Icon(
                               Icons.login_rounded,
-                              color: AppTheme.terracotta,
+                              color: AppTheme.accentNeon,
                             ),
                             SizedBox(width: 12),
                             Text(
@@ -147,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.walnutBrown,
+                                color: AppTheme.textDark,
                               ),
                             ),
                           ],

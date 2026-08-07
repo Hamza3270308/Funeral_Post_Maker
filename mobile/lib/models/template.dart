@@ -1,8 +1,8 @@
 class Template {
   final String id;
   final String title;
-  final String category;
   final String status;
+  final String thumbnailUrl;
   final double width;
   final double height;
   final Background background;
@@ -13,8 +13,8 @@ class Template {
   Template({
     required this.id,
     required this.title,
-    required this.category,
     required this.status,
+    required this.thumbnailUrl,
     required this.width,
     required this.height,
     required this.background,
@@ -27,20 +27,14 @@ class Template {
     return Template(
       id: json['_id'] ?? '',
       title: json['title'] ?? '',
-      category: json['category'] ?? '',
-      status: json['status'] ?? '',
-      width: (json['width'] as num?)?.toDouble() ?? 1080.0,
-      height: (json['height'] as num?)?.toDouble() ?? 1920.0,
+      status: json['status'] ?? 'draft',
+      thumbnailUrl: json['thumbnailUrl'] ?? '',
+      width: (json['width'] ?? 1080).toDouble(),
+      height: (json['height'] ?? 1080).toDouble(),
       background: Background.fromJson(json['background'] ?? {}),
-      textLayers: (json['textLayers'] as List? ?? [])
-          .map((item) => TextLayer.fromJson(item))
-          .toList(),
-      imageLayers: (json['imageLayers'] as List? ?? [])
-          .map((item) => ImageLayer.fromJson(item))
-          .toList(),
-      shapeLayers: (json['shapeLayers'] as List? ?? [])
-          .map((item) => ShapeLayer.fromJson(item))
-          .toList(),
+      textLayers: (json['textLayers'] as List<dynamic>?)?.map((l) => TextLayer.fromJson(l)).toList() ?? [],
+      imageLayers: (json['imageLayers'] as List<dynamic>?)?.map((l) => ImageLayer.fromJson(l)).toList() ?? [],
+      shapeLayers: (json['shapeLayers'] as List<dynamic>?)?.map((l) => ShapeLayer.fromJson(l)).toList() ?? [],
     );
   }
 
@@ -48,8 +42,8 @@ class Template {
     return {
       '_id': id,
       'title': title,
-      'category': category,
       'status': status,
+      'thumbnailUrl': thumbnailUrl,
       'width': width,
       'height': height,
       'background': background.toJson(),
@@ -61,8 +55,7 @@ class Template {
 
   Template copyWith({
     String? title,
-    double? width,
-    double? height,
+    String? thumbnailUrl,
     Background? background,
     List<TextLayer>? textLayers,
     List<ImageLayer>? imageLayers,
@@ -71,10 +64,10 @@ class Template {
     return Template(
       id: id,
       title: title ?? this.title,
-      category: category,
       status: status,
-      width: width ?? this.width,
-      height: height ?? this.height,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      width: width,
+      height: height,
       background: background ?? this.background,
       textLayers: textLayers ?? this.textLayers,
       imageLayers: imageLayers ?? this.imageLayers,
@@ -105,24 +98,46 @@ class Background {
 }
 
 class TextLayer {
-  final String id;
-  final String content;
-  final String fontFamily;
-  final double fontSize;
-  final String color;
-  final String alignment;
-  final double x;
-  final double y;
-  final double width;
-  final double height;
-  final String fontWeight;
-  final String fontStyle;
-  final String textDecoration;
-  final double opacity;
-  final double rotation;
-  final bool hasShadow;
-  final String shadowColor;
-  final double shadowBlur;
+  String id;
+  String content;
+  String fontFamily;
+  double fontSize;
+  String color;
+  String alignment;
+  double x;
+  double y;
+  double width;
+  double height;
+  String fontWeight;
+  String fontStyle;
+  String textDecoration;
+  String textTransform;
+  double opacity;
+  double rotation;
+  bool hasShadow;
+  String shadowColor;
+  double shadowBlur;
+  double shadowOffsetX;
+  double shadowOffsetY;
+  double glowBlur;
+  String glowColor;
+  double echoOffsetX;
+  double echoOffsetY;
+  String echoColor;
+  double neonIntensity;
+  String neonColor;
+  double curveIntensity;
+  double outlineWidth;
+  String outlineColor;
+  String textBackgroundColor;
+  double letterSpacing;
+  double lineHeight;
+  int zIndex;
+  bool flipHorizontal;
+  bool flipVertical;
+  bool hidden;
+  bool locked;
+  String? groupId;
 
   TextLayer({
     required this.id,
@@ -138,11 +153,33 @@ class TextLayer {
     required this.fontWeight,
     required this.fontStyle,
     required this.textDecoration,
+    this.textTransform = 'none',
     required this.opacity,
-    required this.rotation,
-    required this.hasShadow,
-    required this.shadowColor,
-    required this.shadowBlur,
+    this.rotation = 0.0,
+    this.hasShadow = false,
+    this.shadowColor = '#000000',
+    this.shadowBlur = 0.0,
+    this.shadowOffsetX = 0.0,
+    this.shadowOffsetY = 0.0,
+    this.glowBlur = 0.0,
+    this.glowColor = '#ffffff',
+    this.echoOffsetX = 0.0,
+    this.echoOffsetY = 0.0,
+    this.echoColor = '#000000',
+    this.neonIntensity = 0.0,
+    this.neonColor = '#000000',
+    this.curveIntensity = 0.0,
+    this.outlineWidth = 0.0,
+    this.outlineColor = '#000000',
+    this.textBackgroundColor = '',
+    this.letterSpacing = 0.0,
+    this.lineHeight = 1.2,
+    this.zIndex = 0,
+    this.flipHorizontal = false,
+    this.flipVertical = false,
+    this.hidden = false,
+    this.locked = false,
+    this.groupId,
   });
 
   factory TextLayer.fromJson(Map<String, dynamic> json) {
@@ -160,11 +197,33 @@ class TextLayer {
       fontWeight: json['fontWeight'] ?? 'normal',
       fontStyle: json['fontStyle'] ?? 'normal',
       textDecoration: json['textDecoration'] ?? 'none',
+      textTransform: json['textTransform'] ?? 'none',
       opacity: (json['opacity'] ?? 1.0).toDouble(),
-      rotation: (json['rotation'] ?? 0).toDouble(),
+      rotation: (json['rotation'] ?? 0.0).toDouble(),
       hasShadow: json['hasShadow'] ?? false,
-      shadowColor: json['shadowColor'] ?? 'rgba(0,0,0,0.5)',
-      shadowBlur: (json['shadowBlur'] ?? 4).toDouble(),
+      shadowColor: json['shadowColor'] ?? '#000000',
+      shadowBlur: (json['shadowBlur'] ?? 0.0).toDouble(),
+      shadowOffsetX: (json['shadowOffsetX'] ?? 0.0).toDouble(),
+      shadowOffsetY: (json['shadowOffsetY'] ?? 0.0).toDouble(),
+      glowBlur: (json['glowBlur'] ?? 0.0).toDouble(),
+      glowColor: json['glowColor'] ?? '#ffffff',
+      echoOffsetX: (json['echoOffsetX'] ?? 0.0).toDouble(),
+      echoOffsetY: (json['echoOffsetY'] ?? 0.0).toDouble(),
+      echoColor: json['echoColor'] ?? '#000000',
+      neonIntensity: (json['neonIntensity'] ?? 0.0).toDouble(),
+      neonColor: json['neonColor'] ?? '#000000',
+      curveIntensity: (json['curveIntensity'] ?? 0.0).toDouble(),
+      outlineWidth: (json['outlineWidth'] ?? 0.0).toDouble(),
+      outlineColor: json['outlineColor'] ?? '#000000',
+      textBackgroundColor: json['textBackgroundColor'] ?? '',
+      letterSpacing: (json['letterSpacing'] ?? 0.0).toDouble(),
+      lineHeight: (json['lineHeight'] ?? 1.2).toDouble(),
+      zIndex: json['zIndex'] ?? 0,
+      flipHorizontal: json['flipHorizontal'] ?? false,
+      flipVertical: json['flipVertical'] ?? false,
+      hidden: json['hidden'] ?? false,
+      locked: json['locked'] ?? false,
+      groupId: json['groupId'],
     );
   }
 
@@ -183,11 +242,28 @@ class TextLayer {
       'fontWeight': fontWeight,
       'fontStyle': fontStyle,
       'textDecoration': textDecoration,
+      'textTransform': textTransform,
       'opacity': opacity,
       'rotation': rotation,
       'hasShadow': hasShadow,
       'shadowColor': shadowColor,
       'shadowBlur': shadowBlur,
+      'shadowOffsetX': shadowOffsetX,
+      'shadowOffsetY': shadowOffsetY,
+      'glowBlur': glowBlur,
+      'glowColor': glowColor,
+      'echoOffsetX': echoOffsetX,
+      'echoOffsetY': echoOffsetY,
+      'echoColor': echoColor,
+      'neonIntensity': neonIntensity,
+      'neonColor': neonColor,
+      'curveIntensity': curveIntensity,
+      'zIndex': zIndex,
+      'flipHorizontal': flipHorizontal,
+      'flipVertical': flipVertical,
+      'hidden': hidden,
+      'locked': locked,
+      if (groupId != null) 'groupId': groupId,
     };
   }
 
@@ -195,23 +271,26 @@ class TextLayer {
     String? content,
     String? fontFamily,
     double? fontSize,
-    String? color,
+    String? fontWeight,
+    String? fontStyle,
+    String? textDecoration,
     String? alignment,
+    String? color,
     double? x,
     double? y,
     double? width,
     double? height,
-    String? fontWeight,
-    String? fontStyle,
-    String? textDecoration,
     double? opacity,
     double? rotation,
-    bool? hasShadow,
-    String? shadowColor,
-    double? shadowBlur,
+    int? zIndex,
+    bool? flipHorizontal,
+    bool? flipVertical,
+    bool? hidden,
+    bool? locked,
+    String? groupId,
   }) {
     return TextLayer(
-      id: id,
+      id: this.id,
       content: content ?? this.content,
       fontFamily: fontFamily ?? this.fontFamily,
       fontSize: fontSize ?? this.fontSize,
@@ -224,28 +303,57 @@ class TextLayer {
       fontWeight: fontWeight ?? this.fontWeight,
       fontStyle: fontStyle ?? this.fontStyle,
       textDecoration: textDecoration ?? this.textDecoration,
+      textTransform: this.textTransform,
       opacity: opacity ?? this.opacity,
       rotation: rotation ?? this.rotation,
-      hasShadow: hasShadow ?? this.hasShadow,
-      shadowColor: shadowColor ?? this.shadowColor,
-      shadowBlur: shadowBlur ?? this.shadowBlur,
+      hasShadow: this.hasShadow,
+      shadowColor: this.shadowColor,
+      shadowBlur: this.shadowBlur,
+      shadowOffsetX: this.shadowOffsetX,
+      shadowOffsetY: this.shadowOffsetY,
+      glowBlur: this.glowBlur,
+      glowColor: this.glowColor,
+      echoOffsetX: this.echoOffsetX,
+      echoOffsetY: this.echoOffsetY,
+      echoColor: this.echoColor,
+      neonIntensity: this.neonIntensity,
+      neonColor: this.neonColor,
+      curveIntensity: this.curveIntensity,
+      outlineWidth: this.outlineWidth,
+      outlineColor: this.outlineColor,
+      textBackgroundColor: this.textBackgroundColor,
+      letterSpacing: this.letterSpacing,
+      lineHeight: this.lineHeight,
+      zIndex: zIndex ?? this.zIndex,
+      flipHorizontal: flipHorizontal ?? this.flipHorizontal,
+      flipVertical: flipVertical ?? this.flipVertical,
+      hidden: hidden ?? this.hidden,
+      locked: locked ?? this.locked,
+      groupId: groupId ?? this.groupId,
     );
   }
 }
 
 class ImageLayer {
-  final String id;
-  final String type; // 'frame' | 'sticker'
-  final String url;
-  final String maskShape; // 'none' | 'circle' | 'rounded_rect'
-  final double x;
-  final double y;
-  final double width;
-  final double height;
-  final double rotation;
-  final double opacity;
-  final double borderWidth;
-  final String borderColor;
+  String id;
+  String type; // 'frame' | 'sticker'
+  String url;
+  String maskShape; // 'none' | 'circle' | 'rounded_rect'
+  double x;
+  double y;
+  double width;
+  double height;
+  double rotation;
+  double opacity;
+  double borderWidth;
+  String borderColor;
+  String mixBlendMode;
+  int zIndex;
+  bool flipHorizontal;
+  bool flipVertical;
+  bool hidden;
+  bool locked;
+  String? groupId;
 
   ImageLayer({
     required this.id,
@@ -260,6 +368,13 @@ class ImageLayer {
     required this.opacity,
     required this.borderWidth,
     required this.borderColor,
+    this.mixBlendMode = 'normal',
+    this.zIndex = 0,
+    this.flipHorizontal = false,
+    this.flipVertical = false,
+    this.hidden = false,
+    this.locked = false,
+    this.groupId,
   });
 
   factory ImageLayer.fromJson(Map<String, dynamic> json) {
@@ -276,6 +391,13 @@ class ImageLayer {
       opacity: (json['opacity'] ?? 1.0).toDouble(),
       borderWidth: (json['borderWidth'] ?? 0).toDouble(),
       borderColor: json['borderColor'] ?? '#000000',
+      mixBlendMode: json['mixBlendMode'] ?? 'normal',
+      zIndex: json['zIndex'] ?? 0,
+      flipHorizontal: json['flipHorizontal'] ?? false,
+      flipVertical: json['flipVertical'] ?? false,
+      hidden: json['hidden'] ?? false,
+      locked: json['locked'] ?? false,
+      groupId: json['groupId'],
     );
   }
 
@@ -293,39 +415,73 @@ class ImageLayer {
       'opacity': opacity,
       'borderWidth': borderWidth,
       'borderColor': borderColor,
+      'mixBlendMode': mixBlendMode,
+      'zIndex': zIndex,
+      'flipHorizontal': flipHorizontal,
+      'flipVertical': flipVertical,
+      'hidden': hidden,
+      'locked': locked,
+      if (groupId != null) 'groupId': groupId,
     };
   }
 
-  ImageLayer copyWith({String? url}) {
+  ImageLayer copyWith({
+    String? url,
+    double? borderWidth,
+    String? borderColor,
+    String? mixBlendMode,
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? opacity,
+    double? rotation,
+    int? zIndex,
+    bool? flipHorizontal,
+    bool? flipVertical,
+    bool? hidden,
+    bool? locked,
+    String? groupId,
+  }) {
     return ImageLayer(
       id: id,
       type: type,
       url: url ?? this.url,
       maskShape: maskShape,
-      x: x,
-      y: y,
-      width: width,
-      height: height,
-      rotation: rotation,
-      opacity: opacity,
-      borderWidth: borderWidth,
-      borderColor: borderColor,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      rotation: rotation ?? this.rotation,
+      opacity: opacity ?? this.opacity,
+      borderWidth: borderWidth ?? this.borderWidth,
+      borderColor: borderColor ?? this.borderColor,
+      mixBlendMode: mixBlendMode ?? this.mixBlendMode,
+      zIndex: zIndex ?? this.zIndex,
+      flipHorizontal: flipHorizontal ?? this.flipHorizontal,
+      flipVertical: flipVertical ?? this.flipVertical,
+      hidden: hidden ?? this.hidden,
+      locked: locked ?? this.locked,
+      groupId: groupId ?? this.groupId,
     );
   }
 }
 
 class ShapeLayer {
   final String id;
-  final String shape; // 'circle' | 'square' | 'rounded-rectangle' | 'oval' | 'arch' | 'line' | 'triangle'
-  final String color;
-  final double x;
-  final double y;
-  final double width;
-  final double height;
-  final double opacity;
+  final String shape; // 'circle' | 'square' | 'rounded-rectangle' | 'oval' | 'arch'
+  String color;
+  double x;
+  double y;
+  double width;
+  double height;
+  double opacity;
   final double borderWidth;
   final String borderColor;
-  final double rotation;
+  int zIndex;
+  bool hidden;
+  bool locked;
+  String? groupId;
 
   ShapeLayer({
     required this.id,
@@ -338,7 +494,10 @@ class ShapeLayer {
     required this.opacity,
     required this.borderWidth,
     required this.borderColor,
-    required this.rotation,
+    this.zIndex = 0,
+    this.hidden = false,
+    this.locked = false,
+    this.groupId,
   });
 
   factory ShapeLayer.fromJson(Map<String, dynamic> json) {
@@ -353,7 +512,10 @@ class ShapeLayer {
       opacity: (json['opacity'] ?? 1.0).toDouble(),
       borderWidth: (json['borderWidth'] ?? 0).toDouble(),
       borderColor: json['borderColor'] ?? '#000000',
-      rotation: (json['rotation'] ?? 0).toDouble(),
+      zIndex: json['zIndex'] ?? 0,
+      hidden: json['hidden'] ?? false,
+      locked: json['locked'] ?? false,
+      groupId: json['groupId'],
     );
   }
 
@@ -369,7 +531,40 @@ class ShapeLayer {
       'opacity': opacity,
       'borderWidth': borderWidth,
       'borderColor': borderColor,
-      'rotation': rotation,
+      'zIndex': zIndex,
+      'hidden': hidden,
+      'locked': locked,
+      if (groupId != null) 'groupId': groupId,
     };
+  }
+
+  ShapeLayer copyWith({
+    String? color,
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? opacity,
+    int? zIndex,
+    bool? hidden,
+    bool? locked,
+    String? groupId,
+  }) {
+    return ShapeLayer(
+      id: this.id,
+      shape: this.shape,
+      color: color ?? this.color,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      opacity: opacity ?? this.opacity,
+      borderWidth: this.borderWidth,
+      borderColor: this.borderColor,
+      zIndex: zIndex ?? this.zIndex,
+      hidden: hidden ?? this.hidden,
+      locked: locked ?? this.locked,
+      groupId: groupId ?? this.groupId,
+    );
   }
 }

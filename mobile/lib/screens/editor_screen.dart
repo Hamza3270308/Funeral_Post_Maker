@@ -1,16 +1,74 @@
+import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
-import '../widgets/text_editor_bottom_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_arc_text/flutter_arc_text.dart';
+import 'dart:math';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/template.dart';
+import '../models/memorial_element.dart';
+import '../data/memorial_elements_library.dart';
 import '../services/api_service.dart';
 import '../theme/theme.dart';
 import 'export_screen.dart';
+
+enum SelectedElementType {
+  none,
+  photo,
+  header,
+  name,
+  dates,
+  tribute,
+  overlay,
+  templateImage,
+  shape,
+}
+
+enum ActiveTrayType {
+  none,
+  templates,
+  verses,
+  flowers,
+  text,       // Item 7: Scrollable Canva Typography suite
+  frame,      // Item 8: Custom uploaded frame border
+  photo,      // Compact Photo Tray (~13% height)
+  background, // Item 10: Dedicated Background Tray
+  overlay,    // Added overlay tray
+  fonts,
+  colors,
+  theme,      // Item 5 & 9: Snug Theme tray with Custom Color picker
+}
+
+class TextLayerStyle {
+  String font;
+  Color color;
+  double size;
+  bool bold;
+  bool italic;
+  bool underline;
+  bool uppercase;
+  double letterSpacing;
+  double lineHeight;
+  bool shadow;
+  TextAlign align;
+
+  TextLayerStyle({
+    required this.font,
+    required this.color,
+    required this.size,
+    this.bold = false,
+    this.italic = false,
+    this.underline = false,
+    this.uppercase = false,
+    this.letterSpacing = 0.0,
+    this.lineHeight = 1.2,
+    this.shadow = false,
+    this.align = TextAlign.center,
+  });
+}
 
 class EditorScreen extends StatefulWidget {
   final Template template;
@@ -23,24 +81,167 @@ class EditorScreen extends StatefulWidget {
 
 class _EditorScreenState extends State<EditorScreen> {
   final GlobalKey _repaintKey = GlobalKey();
-  
+
   late String _startingLine;
   late String _deceasedName;
   late String _lifespanDates;
   late String _messageContent;
   String? _localPhotoPath;
+  String? _localBackgroundPath;    // Item 10: Uploaded Custom Background
+  String? _customFrameImagePath;   // Item 8: Uploaded Custom Frame
   bool _isExporting = false;
+  bool _isLayersPanelOpen = false;
 
-  late TextEditingController _startingLineController;
-  late TextEditingController _nameController;
-  late TextEditingController _datesController;
-  late TextEditingController _messageController;
-  late List<TextLayer> _textLayers;
+  // Item 11: Design Title with Rename capability
+  String _designTitle = 'Editing Studio';
 
-  String? _nameFontFamily;
-  String? _datesFontFamily;
+  // Selected element state
+  SelectedElementType _selectedType = SelectedElementType.none;
+  String? _selectedOverlayId;
 
-  static const List<String> _googleFontsLibrary = [
+  // Active Tray State
+  ActiveTrayType _activeTray = ActiveTrayType.none;
+
+  // UNDO/REDO STATE
+  final List<EditorStateSnapshot> _history = [];
+  int _historyIndex = -1;
+
+  void _saveState() {
+    // If we're not at the end of the history (i.e. we undid something and are now making a new change),
+    // we must discard all future redo states.
+    if (_historyIndex < _history.length - 1) {
+      _history.removeRange(_historyIndex + 1, _history.length);
+    }
+    
+    _history.add(EditorStateSnapshot(
+      templateJson: widget.template.toJson(),
+      overlayItems: _overlayItems.map((item) => item.clone()).toList(),
+      frameShapeIndex: _frameShapeIndex,
+      customFrameImagePath: _customFrameImagePath,
+      localBackgroundPath: _localBackgroundPath,
+      localPhotoPath: _localPhotoPath,
+    ));
+    _historyIndex++;
+  }
+
+  void _undo() {
+    if (_historyIndex > 0) {
+      setState(() {
+        _historyIndex--;
+        _restoreState(_history[_historyIndex]);
+      });
+    }
+  }
+
+  void _redo() {
+    if (_historyIndex < _history.length - 1) {
+      setState(() {
+        _historyIndex++;
+        _restoreState(_history[_historyIndex]);
+      });
+    }
+  }
+
+  void _restoreState(EditorStateSnapshot snapshot) {
+    // We update the template fields manually to trigger a re-render without breaking references if needed,
+    // or just re-assign the template objects by parsing the json.
+    final restoredTemplate = Template.fromJson(snapshot.templateJson);
+    widget.template.textLayers.clear();
+    widget.template.textLayers.addAll(restoredTemplate.textLayers);
+    widget.template.imageLayers.clear();
+    widget.template.imageLayers.addAll(restoredTemplate.imageLayers);
+    widget.template.shapeLayers.clear();
+    widget.template.shapeLayers.addAll(restoredTemplate.shapeLayers);
+
+    _overlayItems.clear();
+    _overlayItems.addAll(snapshot.overlayItems.map((item) => item.clone()));
+    _frameShapeIndex = snapshot.frameShapeIndex;
+    _customFrameImagePath = snapshot.customFrameImagePath;
+    _localBackgroundPath = snapshot.localBackgroundPath;
+    _localPhotoPath = snapshot.localPhotoPath;
+
+    // Sync local text strings
+    final layers = widget.template.textLayers;
+    _startingLine = layers.isNotEmpty ? layers[0].content : '';
+    _deceasedName = layers.length > 1 ? layers[1].content : '';
+    _lifespanDates = layers.length > 2 ? layers[2].content : '';
+    _messageContent = layers.length > 3 ? layers[3].content : '';
+    
+    // Update text controller if something is selected
+    if (_selectedType == SelectedElementType.header) _textEditingController.text = _startingLine;
+    if (_selectedType == SelectedElementType.name) _textEditingController.text = _deceasedName;
+    if (_selectedType == SelectedElementType.dates) _textEditingController.text = _lifespanDates;
+    if (_selectedType == SelectedElementType.tribute) _textEditingController.text = _messageContent;
+
+    // We may need to re-derive text styles based on the restored template
+    _rebuildTextStyles();
+    
+    // Unselect if the selected item no longer exists
+    if (_selectedType == SelectedElementType.overlay && !_overlayItems.any((i) => i.id == _selectedOverlayId)) {
+      _deselectAll();
+    }
+  }
+
+  void _rebuildTextStyles() {
+    // FIX #6 logic duplicated for restore
+    final layers = widget.template.textLayers;
+    TextLayerStyle styleFromLayer(TextLayer l) {
+      Color col = Colors.white;
+      try {
+        final hex = l.color.replaceFirst('#', '');
+        col = Color(int.parse('FF$hex', radix: 16));
+      } catch (_) {}
+      final displaySize = (l.fontSize * 1080).clamp(12.0, 64.0);
+      return TextLayerStyle(
+        font: l.fontFamily.isNotEmpty ? l.fontFamily : 'Inter',
+        color: col,
+        size: displaySize,
+        bold: l.fontWeight == 'bold',
+        italic: l.fontStyle == 'italic',
+        underline: l.textDecoration == 'underline',
+        uppercase: l.textTransform == 'uppercase',
+        letterSpacing: l.letterSpacing,
+        lineHeight: l.lineHeight,
+        shadow: l.hasShadow,
+        align: l.alignment == 'center'
+            ? TextAlign.center
+            : (l.alignment == 'right' ? TextAlign.right : TextAlign.left),
+      );
+    }
+
+    _textStyles = {
+      SelectedElementType.header: layers.isNotEmpty
+          ? styleFromLayer(layers[0])
+          : TextLayerStyle(font: 'Cinzel', color: const Color(0xFF1B2430), size: 18.0, bold: true),
+      SelectedElementType.name: layers.length > 1
+          ? styleFromLayer(layers[1])
+          : TextLayerStyle(font: 'Great Vibes', color: const Color(0xFF1B2430), size: 38.0, bold: true),
+      SelectedElementType.dates: layers.length > 2
+          ? styleFromLayer(layers[2])
+          : TextLayerStyle(font: 'Cinzel', color: const Color(0xFF3B4856), size: 16.0),
+      SelectedElementType.tribute: layers.length > 3
+          ? styleFromLayer(layers[3])
+          : TextLayerStyle(font: 'Inter', color: const Color(0xFF2C353F), size: 14.0, lineHeight: 1.4),
+    };
+  }
+
+  // Controller for live Text Editing
+  final TextEditingController _textEditingController = TextEditingController();
+
+  // Added Flowers & Graphics on canvas
+  final List<CanvasOverlayItem> _overlayItems = [];
+
+  // Frame shape for photo:
+  // 0 = Circle, 1 = Oval, 2 = Rounded Square, 3 = Arch, 4 = Soft Hex, 5 = Custom Uploaded Frame
+  int _frameShapeIndex = 0;
+  double _customBorderRadius = 32.0;
+
+  // Vibrant Lime Green / Neon Chartreuse Accent from user screenshot
+  static const Color _limeAccent = Color(0xFFBAFF00);
+  static const Color _darkBlack = Color(0xFF0F172A);
+
+  // All 35 Web Dashboard Google Fonts
+  static const List<String> allWebGoogleFonts = [
     'Inter',
     'Playfair Display',
     'Roboto',
@@ -60,50 +261,731 @@ class _EditorScreenState extends State<EditorScreen> {
     'Lato',
     'Open Sans',
     'Raleway',
+    'Bodoni Moda',
+    'Cinzel Decorative',
+    'Cormorant Infant',
+    'Crimson Text',
+    'Marcellus',
+    'Montserrat Alternates',
+    'Cardo',
+    'Italiana',
+    'Prata',
+    'Allura',
+    'Sacramento',
+    'WindSong',
+    'Reenie Beanie',
+    'Satisfy',
+    'Petit Formal Script',
+    'Rouge Script',
   ];
+
+  late Map<SelectedElementType, TextLayerStyle> _textStyles;
+  TextLayer? _activeTextLayer;
+
+  // Current theme palette background tint (off-white cream default)
+  Color _canvasBgTint = const Color(0xFFFAF9F6);
 
   @override
   void initState() {
     super.initState();
+    if (widget.template.title.isNotEmpty) {
+      _designTitle = widget.template.title;
+    }
+    final layers = widget.template.textLayers;
+    _startingLine = layers.isNotEmpty ? layers[0].content : 'IN LOVING MEMORY';
+    _deceasedName = layers.length > 1 ? layers[1].content : 'Olivia Wilson';
+    _lifespanDates = layers.length > 2 ? layers[2].content : 'July 14, 1968 - August 09, 2030';
+    _messageContent = layers.length > 3
+        ? layers[3].content
+        : 'May your soul find eternal peace, and may your light continue to shine in our hearts forever.';
+
+    // FIX #6: Build _textStyles from actual DB layer values, not hardcoded defaults
+    TextLayerStyle _styleFromLayer(TextLayer l) {
+      Color col = Colors.white;
+      try {
+        final hex = l.color.replaceFirst('#', '');
+        col = Color(int.parse('FF$hex', radix: 16));
+      } catch (_) {}
+      // l.fontSize is a normalized fraction (e.g. 0.074 = 7.4% of canvas width).
+      // Convert to a display point size clamped to the slider range (12–64pt).
+      // We use a reference canvas width of 1080px for consistency.
+      final displaySize = (l.fontSize * 1080).clamp(12.0, 64.0);
+      return TextLayerStyle(
+        font: l.fontFamily.isNotEmpty ? l.fontFamily : 'Inter',
+        color: col,
+        size: displaySize,
+        bold: l.fontWeight == 'bold',
+        italic: l.fontStyle == 'italic',
+        underline: l.textDecoration == 'underline',
+        uppercase: l.textTransform == 'uppercase',
+        letterSpacing: l.letterSpacing,
+        lineHeight: l.lineHeight,
+        shadow: l.hasShadow,
+        align: l.alignment == 'center'
+            ? TextAlign.center
+            : (l.alignment == 'right' ? TextAlign.right : TextAlign.left),
+      );
+    }
+
+    _textStyles = {
+      SelectedElementType.header: layers.isNotEmpty
+          ? _styleFromLayer(layers[0])
+          : TextLayerStyle(font: 'Cinzel', color: const Color(0xFF1B2430), size: 18.0, bold: true),
+      SelectedElementType.name: layers.length > 1
+          ? _styleFromLayer(layers[1])
+          : TextLayerStyle(font: 'Great Vibes', color: const Color(0xFF1B2430), size: 38.0, bold: true),
+      SelectedElementType.dates: layers.length > 2
+          ? _styleFromLayer(layers[2])
+          : TextLayerStyle(font: 'Cinzel', color: const Color(0xFF3B4856), size: 16.0),
+      SelectedElementType.tribute: layers.length > 3
+          ? _styleFromLayer(layers[3])
+          : TextLayerStyle(font: 'Inter', color: const Color(0xFF2C353F), size: 14.0, lineHeight: 1.4),
+    };
+
+    // FIX #14: Pre-load all Google Fonts used in this template to avoid flicker
+    final usedFonts = layers.map((l) => l.fontFamily).toSet();
+    for (final fontName in usedFonts) {
+      try {
+        GoogleFonts.getFont(fontName); // triggers async font load
+      } catch (_) {} // not a Google Font — fine
+    }
+
+    // Initialize portrait frame shape from saved maskShape in DB
+    final frameLayer = widget.template.imageLayers
+        .where((l) => l.type == 'frame')
+        .cast<ImageLayer?>()
+        .firstWhere((_) => true, orElse: () => null);
+    if (frameLayer != null) {
+      switch (frameLayer.maskShape) {
+        case 'circle': _frameShapeIndex = 0; break;
+        case 'rounded_rect': _frameShapeIndex = 2; break;
+        default: _frameShapeIndex = 2; break;
+      }
+    }
+
+    // Restore stickers from imageLayers back to _overlayItems
+    final stickerLayers = widget.template.imageLayers.where((l) => l.type == 'sticker').toList();
+    for (var layer in stickerLayers) {
+      if (layer.url.isNotEmpty) {
+        final filename = layer.url.split('/').last;
+        final graphic = MemorialElementsLibrary.graphics.firstWhere(
+          (g) => g.imageFile == filename,
+          orElse: () => MemorialElementsLibrary.graphics.first, // fallback
+        );
+        _overlayItems.add(CanvasOverlayItem(
+          id: layer.id,
+          graphic: graphic,
+          position: Offset(layer.x * widget.template.width, layer.y * widget.template.height),
+          scale: layer.width / 0.9,
+          rotation: layer.rotation,
+          opacity: layer.opacity,
+          color: graphic.defaultColor,
+          zIndex: layer.zIndex,
+        ));
+      }
+    }
+    widget.template.imageLayers.removeWhere((l) => l.type == 'sticker');
     
-    // Initialize default texts from layers
-    _startingLine = widget.template.textLayers.firstWhere(
-      (l) => l.id == '1', 
-      orElse: () => TextLayer(id: '1', content: 'In Loving Memory Of', fontFamily: 'Inter', fontSize: 16, color: '#000000', alignment: 'center', x: 0, y: 0, width: 200, height: 40, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', opacity: 1.0, rotation: 0.0, hasShadow: false, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 4.0)
-    ).content;
-
-    _deceasedName = widget.template.textLayers.firstWhere(
-      (l) => l.id == '2', 
-      orElse: () => TextLayer(id: '2', content: 'John Doe', fontFamily: 'Inter', fontSize: 24, color: '#000000', alignment: 'center', x: 0, y: 0, width: 200, height: 40, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', opacity: 1.0, rotation: 0.0, hasShadow: false, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 4.0)
-    ).content;
-
-    _lifespanDates = widget.template.textLayers.firstWhere(
-      (l) => l.id == 'date', 
-      orElse: () => TextLayer(id: 'date', content: 'Sunrise 1950 - Sunset 2024', fontFamily: 'Inter', fontSize: 16, color: '#000000', alignment: 'center', x: 0, y: 0, width: 200, height: 40, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', opacity: 1.0, rotation: 0.0, hasShadow: false, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 4.0)
-    ).content;
-
-    _messageContent = widget.template.textLayers.firstWhere(
-      (l) => l.id == 'message', 
-      orElse: () => TextLayer(id: 'message', content: 'You will always be in our hearts.', fontFamily: 'Inter', fontSize: 16, color: '#000000', alignment: 'center', x: 0, y: 0, width: 200, height: 40, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', opacity: 1.0, rotation: 0.0, hasShadow: false, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 4.0)
-    ).content;
-
-    _startingLineController = TextEditingController(text: _startingLine);
-    _nameController = TextEditingController(text: _deceasedName);
-    _datesController = TextEditingController(text: _lifespanDates);
-    _messageController = TextEditingController(text: _messageContent);
-
-    _textLayers = widget.template.textLayers.map((l) => l.copyWith()).toList();
+    // Save initial state for undo system
+    _saveState();
   }
 
   @override
   void dispose() {
-    _startingLineController.dispose();
-    _nameController.dispose();
-    _datesController.dispose();
-    _messageController.dispose();
+    _textEditingController.dispose();
     super.dispose();
   }
 
+  void _deselectAll() {
+    setState(() {
+      _selectedType = SelectedElementType.none;
+      _selectedOverlayId = null;
+      _activeTray = ActiveTrayType.none;
+    });
+    FocusScope.of(context).unfocus();
+  }
+
+  void _deleteSelectedElement() {
+    setState(() {
+      if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+        _overlayItems.removeWhere((i) => i.id == _selectedOverlayId);
+      } else if (_selectedType == SelectedElementType.templateImage && _selectedOverlayId != null) {
+        widget.template.imageLayers.removeWhere((i) => i.id == _selectedOverlayId);
+      } else if (_selectedType == SelectedElementType.header || 
+                 _selectedType == SelectedElementType.name ||
+                 _selectedType == SelectedElementType.dates ||
+                 _selectedType == SelectedElementType.tribute) {
+        
+        TextLayer? targetLayer = _activeTextLayer;
+        if (targetLayer == null) {
+          if (_selectedType == SelectedElementType.header && widget.template.textLayers.isNotEmpty) targetLayer = widget.template.textLayers[0];
+          else if (_selectedType == SelectedElementType.name && widget.template.textLayers.length > 1) targetLayer = widget.template.textLayers[1];
+          else if (_selectedType == SelectedElementType.dates && widget.template.textLayers.length > 2) targetLayer = widget.template.textLayers[2];
+          else if (_selectedType == SelectedElementType.tribute && widget.template.textLayers.length > 3) targetLayer = widget.template.textLayers[3];
+        }
+
+        if (targetLayer != null) {
+           targetLayer.content = '';
+        }
+
+        if (_selectedType == SelectedElementType.header) _startingLine = '';
+        if (_selectedType == SelectedElementType.name) _deceasedName = '';
+        if (_selectedType == SelectedElementType.dates) _lifespanDates = '';
+        if (_selectedType == SelectedElementType.tribute) _messageContent = '';
+        
+      } else if (_selectedType == SelectedElementType.photo) {
+        _localPhotoPath = null;
+        _customFrameImagePath = null;
+      }
+      _selectedType = SelectedElementType.none;
+      _selectedOverlayId = null;
+      _activeTray = ActiveTrayType.none;
+    });
+    _saveState();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Element deleted'), duration: Duration(seconds: 1)),
+    );
+  }
+
+  // Item 11: Rename Design Dialog
+  void _showRenameDialog() {
+    final c = TextEditingController(text: _designTitle);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename Memorial Design', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: TextField(
+          controller: c,
+          decoration: const InputDecoration(
+            labelText: 'Design Title',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                if (c.text.trim().isNotEmpty) {
+                  _designTitle = c.text.trim();
+                }
+              });
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _limeAccent,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Item 9: Pick Custom Background Tint Color
+  void _showCustomColorPicker() {
+    Color selectedColor = _canvasBgTint;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choose Custom Canvas Color', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: SingleChildScrollView(
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              Colors.white,
+              const Color(0xFFFAF9F6),
+              const Color(0xFFFFFDD0),
+              const Color(0xFFE8F1F5),
+              const Color(0xFFEFE6DD),
+              const Color(0xFFFDEBED),
+              const Color(0xFFEDF7ED),
+              const Color(0xFFFFF5E1),
+              const Color(0xFFE2E8F0),
+              const Color(0xFFCBD5E1),
+              const Color(0xFF475569),
+              const Color(0xFF1E293B),
+              const Color(0xFF0F172A),
+              Colors.black,
+              const Color(0xFFBAFF00), // Lime Green
+              const Color(0xFFD4AF37), // Gold
+            ].map((col) {
+              return GestureDetector(
+                onTap: () {
+                  selectedColor = col;
+                  setState(() => _canvasBgTint = col);
+                  Navigator.pop(ctx);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: col,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _darkBlack, width: 2),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Toggle tray off when clicking the same option again
+  void _toggleTray(ActiveTrayType type) {
+    setState(() {
+      if (_activeTray == type) {
+        _activeTray = ActiveTrayType.none;
+      } else {
+        _activeTray = type;
+        if (type == ActiveTrayType.text) {
+          _openIntegratedTextTrayFor(
+            _selectedType != SelectedElementType.none &&
+                    _textStyles.containsKey(_selectedType)
+                ? _selectedType
+                : SelectedElementType.tribute,
+          );
+        }
+      }
+    });
+  }
+
+  // Add a Flower or Graphic sticker to canvas
+  void _addOverlayGraphic(MemorialGraphic g) {
+    final w = widget.template.width;
+    final h = widget.template.height;
+    // Fix scaling math: default should be 1.0. 
+    // And since it renders at `w * 0.9 * scale`, a default scale of ~0.44 gives ~40% canvas width.
+    final defaultScale = g.isImageOverlay ? 0.45 : 1.0;
+    
+    final newItem = CanvasOverlayItem(
+      id: 'item_${DateTime.now().millisecondsSinceEpoch}',
+      graphic: g,
+      position: g.isImageOverlay
+          ? Offset(w * 0.05, h * 0.05)
+          : const Offset(80, 80),
+      scale: defaultScale,
+      rotation: 0.0,
+      color: g.defaultColor,
+    );
+    
+    setState(() {
+      if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+        // Replace the currently selected flower instead of piling them up
+        final existingIndex = _overlayItems.indexWhere((i) => i.id == _selectedOverlayId);
+        if (existingIndex != -1) {
+          final oldItem = _overlayItems[existingIndex];
+          newItem.position = oldItem.position;
+          newItem.scale = oldItem.scale;
+          _overlayItems[existingIndex] = newItem;
+        } else {
+          _overlayItems.add(newItem);
+        }
+      } else {
+        _overlayItems.add(newItem);
+      }
+      
+      _selectedType = SelectedElementType.overlay;
+      _selectedOverlayId = newItem.id;
+      // Change to the new overlay tray (Item 10 -> ActiveTrayType.overlay)
+      // We will build this new tray to have the size slider
+      _activeTray = ActiveTrayType.overlay;
+    });
+    _saveState();
+  }
+
+  CanvasOverlayItem? get _currentOverlay {
+    if (_selectedOverlayId == null) return null;
+    try {
+      return _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Pick photo from gallery
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (image != null) {
+      setState(() {
+        _localPhotoPath = image.path;
+      });
+      _saveState();
+    }
+  }
+
+  // Item 10: Pick Custom Background Photo from gallery
+  Future<void> _pickBackgroundPhoto() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (image != null) {
+      setState(() {
+        _localBackgroundPath = image.path;
+      });
+      _saveState();
+    }
+  }
+
+  // Item 8: Pick Custom Frame PNG from gallery
+  Future<void> _pickCustomFrameImage() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (image != null) {
+      setState(() {
+        _customFrameImagePath = image.path;
+        _frameShapeIndex = 5; // Switch to custom frame
+      });
+      _saveState();
+    }
+  }
+
+  // Export & Share full canvas at 3x resolution
+  Future<void> _exportAndShare() async {
+    _deselectAll();
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    setState(() => _isExporting = true);
+    try {
+      final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final buffer = byteData?.buffer.asUint8List();
+
+      if (buffer != null) {
+        final dir = await getTemporaryDirectory();
+        final filePath = '${dir.path}/memorial_post_${DateTime.now().millisecondsSinceEpoch}.png';
+        final file = File(filePath);
+        await file.writeAsBytes(buffer);
+
+        if (mounted) {
+          // Sync overlays to image layers as stickers so they save to the backend
+          final w = widget.template.width.toDouble();
+          final h = widget.template.height.toDouble();
+          
+          final List<ImageLayer> stickerLayers = _overlayItems.map<ImageLayer>((item) {
+            final isImage = item.graphic.isImageOverlay;
+            final layerW = isImage ? 0.9 * item.scale : (item.graphic.defaultSize * item.scale) / w;
+            final layerH = isImage ? 0.9 * item.scale : (item.graphic.defaultSize * item.scale) / h;
+            return ImageLayer(
+              id: item.id,
+              type: 'sticker',
+              url: item.graphic.imageFile != null ? '/flowers/${item.graphic.imageFile}' : '',
+              maskShape: 'none',
+              x: item.position.dx / w,
+              y: item.position.dy / h,
+              width: layerW,
+              height: layerH,
+              rotation: item.rotation,
+              opacity: item.opacity,
+              borderWidth: 0.0,
+              borderColor: '#000000',
+              zIndex: item.zIndex,
+            );
+          }).toList();
+          
+          widget.template.imageLayers.removeWhere((l) => l.type == 'sticker');
+          widget.template.imageLayers.addAll(stickerLayers);
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ExportScreen(
+                imagePath: filePath,
+                template: widget.template,
+                deceasedName: _deceasedName,
+                lifespanDates: _lifespanDates,
+                designTitle: _designTitle, // Item 11: Pass editable title
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  // Item 5: Content-Adaptive Dynamic Tray Heights (snug fit, no bottom empty space!)
+  double _getTrayHeight(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    switch (_activeTray) {
+      case ActiveTrayType.photo:
+      case ActiveTrayType.background:
+        return 110.0; // Compact ~13% height!
+      case ActiveTrayType.frame:
+        return _frameShapeIndex == 5 ? 160.0 : 110.0; // Adapt for custom upload button
+      case ActiveTrayType.templates:
+      case ActiveTrayType.colors:
+      case ActiveTrayType.overlay:
+        return 135.0; // Compact ~16% height!
+      case ActiveTrayType.theme:
+        return 175.0; // Item 5: Snug height for 16 swatches + Custom Color button
+      case ActiveTrayType.text:
+        return 260.0; // Item 7: Proportioned height for Scrollable Canva Typography Suite
+      case ActiveTrayType.verses:
+      case ActiveTrayType.flowers:
+      case ActiveTrayType.fonts:
+        return h * 0.28; // Standard scrollable list height
+      case ActiveTrayType.none:
+        return 0.0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      resizeToAvoidBottomInset: false,
+      body: SafeArea(
+        bottom: false, // FIX #11: handle bottom inset manually on the dock
+        child: Column(
+          children: [
+            _buildTopStudioHeader(),
+            
+            // ADVANCED SECONDARY TOOLBAR
+            if (_selectedType != SelectedElementType.none && !_isLayersPanelOpen)
+              _buildSecondaryToolbar(),
+            
+            // TOP CANVAS WORKSPACE
+            Expanded(
+              child: GestureDetector(
+                onTap: _deselectAll,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeInOutCubicEmphasized,
+                  // FIX #4: _canvasBgTint belongs on the workspace area, not the canvas itself
+                  color: _canvasBgTint,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: _activeTray != ActiveTrayType.none ? 8 : 10,
+                    vertical: _activeTray != ActiveTrayType.none ? 6 : 14,
+                  ),
+                  alignment: Alignment.center,
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: SizedBox(
+                      width: widget.template.width.toDouble(),
+                      height: widget.template.height.toDouble(),
+                      child: _buildFullCanvasWorkspace(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            
+            // DYNAMIC LAYERS PANEL OR STANDARD DOCK
+            if (_isLayersPanelOpen)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 100.0),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.45,
+                  child: _buildLayersPanel(),
+                ),
+              )
+            else ...[
+              // DYNAMIC CONTENT-ADAPTIVE TRAY
+              if (_activeTray != ActiveTrayType.none) _buildActiveTrayPanel(),
+              // FIX #11: Bottom dock respects system home indicator
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 100.0),
+                  child: _buildMainStudioDock(),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // TOP STUDIO NAVBAR (Crisp Light Theme + Item 1 Delete + Item 11 Rename)
+  Widget _buildTopStudioHeader() {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _darkBlack, size: 18),
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(8),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const SizedBox(width: 4),
+                // Item 11: Tappable Design Title with Pencil Rename Icon
+                Flexible(
+                  child: InkWell(
+                    onTap: _showRenameDialog,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _designTitle,
+                              style: const TextStyle(
+                                color: _darkBlack,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.edit_outlined, color: _darkBlack, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Item 1: Prominent Canva-Style Delete Button when an element is selected
+              if (_selectedType != SelectedElementType.none)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 22),
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  tooltip: 'Delete Selected Element',
+                  onPressed: _deleteSelectedElement,
+                ),
+              IconButton(
+                icon: Icon(Icons.undo_rounded, color: _historyIndex > 0 ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1), size: 20),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                onPressed: _historyIndex > 0 ? _undo : null,
+              ),
+              IconButton(
+                icon: Icon(Icons.redo_rounded, color: _historyIndex < _history.length - 1 ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1), size: 20),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                onPressed: _historyIndex < _history.length - 1 ? _redo : null,
+              ),
+              const SizedBox(width: 4),
+              ElevatedButton.icon(
+                onPressed: _isExporting ? null : _exportAndShare,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _limeAccent, // Vibrant Lime Green Accent
+                  foregroundColor: Colors.black, // Crisp Black Text
+                  elevation: 0,
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: const BorderSide(color: _darkBlack, width: 1.5),
+                  ),
+                ),
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                      )
+                    : const Icon(Icons.ios_share_rounded, size: 16),
+                label: const Text(
+                  'Share',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // FIX #4 + #12: Canvas is transparent — background comes from _buildTemplateBackground.
+  // Double FittedBox removed — outer build() already sizes and scales via FittedBox+SizedBox.
+  Widget _buildFullCanvasWorkspace() {
+    final renderWidth = widget.template.width;
+    final renderHeight = widget.template.height;
+
+    return RepaintBoundary(
+      key: _repaintKey,
+      child: Container(
+        // No explicit width/height: parent SizedBox(1080,1920) + outer FittedBox handles sizing
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 28,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Stack(
+          children: [
+            Positioned.fill(child: _buildTemplateBackground()),
+            ..._buildSortedLayers(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildSortedLayers() {
+    final allLayers = <Map<String, dynamic>>[];
+    for (var layer in widget.template.imageLayers) {
+      if (!layer.hidden) allLayers.add({'zIndex': layer.zIndex, 'widget': _buildImageLayer(layer)});
+    }
+    for (var layer in widget.template.shapeLayers) {
+      if (!layer.hidden) allLayers.add({'zIndex': layer.zIndex, 'widget': _buildShapeLayer(layer)});
+    }
+    for (var layer in widget.template.textLayers) {
+      if (!layer.hidden) allLayers.add({'zIndex': layer.zIndex, 'widget': _buildSelectableText(layer: layer)});
+    }
+    for (var layer in _overlayItems) {
+      if (!layer.hidden) allLayers.add({'zIndex': layer.zIndex, 'widget': _buildSingleOverlayWidget(layer)});
+    }
+    
+    allLayers.sort((a, b) => (a['zIndex'] as int).compareTo(b['zIndex'] as int));
+    return allLayers.map((e) => e['widget'] as Widget).toList();
+  }
+
+  // Item 10: Supports both template background and user-uploaded custom background photo
   Color _parseHexColor(String hexString) {
     try {
       final buffer = StringBuffer();
@@ -111,673 +993,514 @@ class _EditorScreenState extends State<EditorScreen> {
       buffer.write(hexString.replaceFirst('#', ''));
       return Color(int.parse(buffer.toString(), radix: 16));
     } catch (e) {
-      return Colors.white;
+      return Colors.black;
     }
   }
 
-  Color _parseColor(String colorStr) {
-    if (colorStr.startsWith('rgba')) {
+  // ROUTE IMAGE LAYERS: portrait frames go to _buildSelectablePhoto, stickers are rendered directly
+  Widget _buildImageLayer(ImageLayer layer) {
+    if (layer.type == 'frame') {
+      return _buildSelectablePhoto(layer: layer);
+    }
+    // Sticker: resolve URL and render a positioned image
+    final w = widget.template.width;
+    final h = widget.template.height;
+    final resolvedUrl = ApiService.resolveImageUrl(layer.url);
+
+    Widget imageWidget;
+      if (resolvedUrl.startsWith('data:image/svg+xml')) {
+      // SVG data URI: decode from base64 after the comma
       try {
-        final matches = RegExp(r'rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)').firstMatch(colorStr);
-        if (matches != null) {
-          int r = int.parse(matches.group(1)!);
-          int g = int.parse(matches.group(2)!);
-          int b = int.parse(matches.group(3)!);
-          double a = double.parse(matches.group(4)!);
-          return Color.fromRGBO(r, g, b, a);
-        }
-      } catch (e) {}
-    }
-    return _parseHexColor(colorStr);
-  }
-
-  TextStyle _getTextStyle(TextLayer text, double scale, bool isBold, bool isItalic, bool isUnderline) {
-    final baseStyle = TextStyle(
-      fontSize: text.fontSize * scale,
-      color: _parseHexColor(text.color),
-      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-      fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-      decoration: isUnderline ? TextDecoration.underline : TextDecoration.none,
-      shadows: text.hasShadow ? [
-        Shadow(
-          color: _parseColor(text.shadowColor),
-          blurRadius: text.shadowBlur * scale,
-          offset: Offset(0, 2 * scale),
-        )
-      ] : null,
-    );
-
-    String family = text.fontFamily;
-    
-    if (family == 'Georgia' || family == 'serif') {
-      return baseStyle.copyWith(fontFamily: 'serif');
-    }
-    if (family == 'sans-serif') {
-      return baseStyle.copyWith(fontFamily: 'sans-serif');
-    }
-
-    try {
-      return GoogleFonts.getFont(family, textStyle: baseStyle);
-    } catch (e) {
-      return baseStyle.copyWith(fontFamily: 'sans-serif');
-    }
-  }
-
-  Gradient? _parseCssGradient(String gradientStr) {
-    if (!gradientStr.startsWith('linear-gradient')) return null;
-    try {
-      final match = RegExp(r'linear-gradient\((\d+)deg,\s*(#[a-fA-F0-9]{6}),\s*(#[a-fA-F0-9]{6})\)').firstMatch(gradientStr);
-      if (match != null) {
-        final angle = int.parse(match.group(1)!);
-        final color1 = _parseHexColor(match.group(2)!);
-        final color2 = _parseHexColor(match.group(3)!);
-        
-        Alignment begin = Alignment.topLeft;
-        Alignment end = Alignment.bottomRight;
-        
-        if (angle >= 0 && angle < 45) {
-          begin = Alignment.bottomCenter;
-          end = Alignment.topCenter;
-        } else if (angle >= 45 && angle < 135) {
-          begin = Alignment.bottomLeft;
-          end = Alignment.topRight;
-        } else if (angle >= 135 && angle < 225) {
-          begin = Alignment.topLeft;
-          end = Alignment.bottomRight;
-        } else if (angle >= 225 && angle < 315) {
-          begin = Alignment.topCenter;
-          end = Alignment.bottomCenter;
-        } else {
-          begin = Alignment.topRight;
-          end = Alignment.bottomLeft;
-        }
-
-        return LinearGradient(
-          begin: begin,
-          end: end,
-          colors: [color1, color2],
+        final base64Str = resolvedUrl.split(',').last;
+        final bytes = base64Decode(base64Str);
+        imageWidget = Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          color: layer.mixBlendMode == 'multiply' ? Colors.black.withOpacity(0.0) : null,
+          colorBlendMode: layer.mixBlendMode == 'multiply' ? BlendMode.multiply : null,
         );
+      } catch (_) {
+        imageWidget = const SizedBox.shrink();
       }
-    } catch (e) {
-      // Fallback to null
+    } else if (resolvedUrl.startsWith('assets/')) {
+      imageWidget = Image.asset(
+        resolvedUrl,
+        fit: BoxFit.fill,
+        color: layer.mixBlendMode == 'multiply' ? Colors.black.withOpacity(0.0) : null,
+        colorBlendMode: layer.mixBlendMode == 'multiply' ? BlendMode.multiply : null,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      );
+    } else if (resolvedUrl.startsWith('http')) {
+      imageWidget = Image.network(
+        resolvedUrl,
+        fit: BoxFit.fill, // Match web dashboard's objectFit: 'fill' to preserve layout
+        color: layer.mixBlendMode == 'multiply' ? Colors.black.withOpacity(0.0) : null,
+        colorBlendMode: layer.mixBlendMode == 'multiply' ? BlendMode.multiply : null,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      );
+    } else {
+      imageWidget = const SizedBox.shrink();
     }
-    return null;
-  }
 
-  String _resolveImageUrl(String url) {
-    if (url.startsWith('http://127.0.0.1:5001')) {
-      return url.replaceFirst('http://127.0.0.1:5001', ApiService.baseUrl);
-    }
-    return url;
-  }
-
-  void _openTextEditor(String layerId) {
-    final layerIndex = _textLayers.indexWhere((l) => l.id == layerId);
-    if (layerIndex == -1) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return TextEditorBottomSheet(
-          initialLayer: _textLayers[layerIndex],
-          googleFontsLibrary: _googleFontsLibrary,
-          onLayerUpdated: (updatedLayer) {
-            setState(() {
-              _textLayers[layerIndex] = updatedLayer;
-            });
-          },
-        );
-      },
+    imageWidget = Opacity(
+      opacity: layer.opacity,
+      child: Transform.scale(
+        scaleX: layer.flipHorizontal ? -1.0 : 1.0,
+        scaleY: layer.flipVertical ? -1.0 : 1.0,
+        child: imageWidget,
+      ),
     );
-  }
 
-  Future<void> _pickPhoto() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _localPhotoPath = pickedFile.path;
-      });
-    }
-  }
+    final isSelected = _selectedType == SelectedElementType.templateImage && _selectedOverlayId == layer.id && !layer.locked;
 
-  Future<void> _shareTribute() async {
-    setState(() {
-      _isExporting = true;
-    });
-
-    try {
-      // Small delay to ensure any active keyboard is hidden
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw Exception('Boundary not found');
-
-      final image = await boundary.toImage(pixelRatio: 3.0); // 3x scaling for high quality
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw Exception('ByteData is empty');
-      final pngBytes = byteData.buffer.asUint8List();
-
-      final tempDir = await getTemporaryDirectory();
-      final file = await File('${tempDir.path}/tribute_export.png').create();
-      await file.writeAsBytes(pngBytes);
-
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ExportScreen(
-              imagePath: file.path,
-              template: widget.template,
-              deceasedName: _deceasedName,
-              lifespanDates: _lifespanDates,
+    return Positioned(
+      left: layer.x * w,
+      top: layer.y * h,
+      width: layer.width * w,
+      height: layer.height * h,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            if (_selectedType == SelectedElementType.templateImage && _selectedOverlayId == layer.id) {
+              _selectedType = SelectedElementType.none;
+              _selectedOverlayId = null;
+            } else {
+              _selectedType = SelectedElementType.templateImage;
+              _selectedOverlayId = layer.id;
+            }
+          });
+        },
+        onPanUpdate: (details) {
+          _handlePanUpdate(layer, details, w, h);
+        },
+        onPanEnd: (details) {
+          if (!layer.locked) _saveState();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: isSelected
+              ? BoxDecoration(
+                  border: Border.all(color: _limeAccent, width: 2.5),
+                  borderRadius: BorderRadius.circular(8),
+                  color: _limeAccent.withOpacity(0.12),
+                )
+              : null,
+          child: Opacity(
+            opacity: layer.opacity.clamp(0.0, 1.0),
+            child: Transform.rotate(
+              angle: layer.rotation * (3.14159 / 180),
+              child: imageWidget,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShapeLayer(ShapeLayer layer) {
+    final w = widget.template.width;
+    final h = widget.template.height;
+
+    final colorStr = layer.color.trim();
+    BoxDecoration decoration;
+
+    if (colorStr.startsWith('linear-gradient')) {
+      final match = RegExp(r'linear-gradient\((\d+)deg,\s*(#[0-9a-fA-F]{6}),\s*(#[0-9a-fA-F]{6}|transparent)\)')
+          .firstMatch(colorStr);
+      final angle = match != null ? double.tryParse(match.group(1)!) ?? 135 : 135;
+      final c1 = match != null ? _parseHexColor(match.group(2)!) : Colors.grey;
+      final c2Str = match?.group(3) ?? 'transparent';
+      final c2 = c2Str == 'transparent' ? Colors.transparent : _parseHexColor(c2Str);
+      final rad = angle * (pi / 180);
+      decoration = _applyShapeDecoration(layer, gradient: LinearGradient(
+        begin: Alignment(sin(rad), -cos(rad)),
+        end: Alignment(-sin(rad), cos(rad)),
+        colors: [c1, c2],
+      ));
+    } else {
+      decoration = _applyShapeDecoration(layer, solidColor: _parseHexColor(colorStr));
+    }
+
+    final isSelected = _selectedType == SelectedElementType.shape && _selectedOverlayId == layer.id && !layer.locked;
+
+    return Positioned(
+      left: layer.x * w,
+      top: layer.y * h,
+      width: layer.width * w,
+      height: layer.height * h,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            if (_selectedType == SelectedElementType.shape && _selectedOverlayId == layer.id) {
+              _selectedType = SelectedElementType.none;
+              _selectedOverlayId = null;
+            } else {
+              _selectedType = SelectedElementType.shape;
+              _selectedOverlayId = layer.id;
+            }
+          });
+        },
+        onPanUpdate: (details) {
+          _handlePanUpdate(layer, details, w, h);
+        },
+        onPanEnd: (details) {
+          if (!layer.locked) _saveState();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: isSelected
+              ? BoxDecoration(
+                  border: Border.all(color: _limeAccent, width: 2.5),
+                  borderRadius: BorderRadius.circular(8),
+                  color: _limeAccent.withOpacity(0.12),
+                )
+              : null,
+          child: Opacity(
+            opacity: layer.opacity.clamp(0.0, 1.0),
+            child: Container(decoration: decoration),
+          ),
+        ),
+      ),
+    );
+  }
+
+  BoxDecoration _applyShapeDecoration(ShapeLayer layer, {Color? solidColor, Gradient? gradient}) {
+    final border = layer.borderWidth > 0
+        ? Border.all(color: _parseHexColor(layer.borderColor), width: layer.borderWidth * layer.width)
+        : null;
+    switch (layer.shape) {
+      case 'circle':
+      case 'oval':
+        return BoxDecoration(shape: BoxShape.circle, color: solidColor, gradient: gradient, border: border);
+      case 'rounded-rectangle':
+        return BoxDecoration(borderRadius: BorderRadius.circular(24), color: solidColor, gradient: gradient, border: border);
+      case 'arch':
+        return BoxDecoration(
+          borderRadius: const BorderRadius.only(topLeft: Radius.circular(200), topRight: Radius.circular(200)),
+          color: solidColor, gradient: gradient,
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate image: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isExporting = false;
-        });
-      }
+      default:
+        return BoxDecoration(color: solidColor, gradient: gradient, border: border);
     }
   }
 
-  // Visual layout mask shape builder
-  BorderRadius _getShapeBorderRadius(String shape) {
-    if (shape == 'circle' || shape == 'oval') {
-      return BorderRadius.circular(1000);
-    } else if (shape == 'rounded-rectangle') {
-      return BorderRadius.circular(24);
-    } else if (shape == 'arch') {
-      return const BorderRadius.only(
-        topLeft: Radius.circular(150),
-        topRight: Radius.circular(150),
+
+  Widget _buildTemplateBackground() {
+    if (_localBackgroundPath != null) {
+      return Image.file(
+        File(_localBackgroundPath!),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       );
     }
-    return BorderRadius.zero;
+    
+    final bg = widget.template.background;
+    if (bg.type == 'color' && bg.value.startsWith('#')) {
+      try {
+        final hexStr = bg.value.replaceFirst('#', '');
+        return Container(color: Color(int.parse('FF$hexStr', radix: 16)));
+      } catch (_) {}
+    }
+
+    final bgValue = ApiService.resolveImageUrl(bg.value);
+    if (bgValue.isNotEmpty && (bgValue.startsWith('http') || bgValue.startsWith('assets/'))) {
+      final imageProvider = bgValue.startsWith('http')
+          ? NetworkImage(bgValue)
+          : AssetImage(bgValue) as ImageProvider;
+      return Image(
+        image: imageProvider,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Design sizes default is 1080 width, let's look at template metadata if present
-    final double designWidth = widget.template.width > 0 ? widget.template.width : 1080.0;
-    final double designHeight = widget.template.height > 0 ? widget.template.height : 1920.0;
-    final double designAspectRatio = designWidth / designHeight;
+  // Helper to map standard web fonts to Google Fonts available in Flutter
+  String _getFontFamily(String originalFont) {
+    final lower = originalFont.toLowerCase();
+    if (lower.contains('georgia')) return 'Lora';
+    if (lower.contains('times new roman') || lower.contains('times')) return 'Merriweather';
+    if (lower.contains('arial') || lower.contains('helvetica')) return 'Inter';
+    if (lower.contains('courier')) return 'Space Mono';
+    if (lower.contains('brush script') || lower.contains('cursive')) return 'Dancing Script';
+    return originalFont; // Try the original string if no mapping found
+  }
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Customize Tribute'),
-        ),
-        body: Column(
-          children: [
-            // Canvas Preview Area
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final double maxAvailableWidth = constraints.maxWidth - 32.0;
-                  final double maxAvailableHeight = constraints.maxHeight - 32.0;
+  // SELECTABLE TEXT WIDGET WITH LIME GREEN BOUNDING BOX
+  Widget _buildSelectableText({required TextLayer layer}) {
+    final isSelected = _activeTextLayer?.id == layer.id && !layer.locked;
+    final w = widget.template.width;
+    final h = widget.template.height;
 
-                  double previewWidth = maxAvailableWidth;
-                  double previewHeight = previewWidth / designAspectRatio;
+    final displayContent = layer.textTransform == 'uppercase' ? layer.content.toUpperCase() : layer.content;
+    final align = layer.alignment == 'center' ? TextAlign.center : (layer.alignment == 'right' ? TextAlign.right : TextAlign.left);
+    
+    final mappedFont = _getFontFamily(layer.fontFamily);
 
-                  if (previewHeight > maxAvailableHeight) {
-                    previewHeight = maxAvailableHeight;
-                    previewWidth = previewHeight * designAspectRatio;
-                  }
+    TextStyle getBaseStyle() {
+      try {
+        final style = GoogleFonts.getFont(
+          mappedFont,
+          fontSize: layer.fontSize * w,
+          fontWeight: layer.fontWeight == 'bold' ? FontWeight.w700 : FontWeight.w400,
+          fontStyle: layer.fontStyle == 'italic' ? FontStyle.italic : FontStyle.normal,
+          decoration: layer.textDecoration == 'underline' ? TextDecoration.underline : TextDecoration.none,
+          color: _parseHexColor(layer.color),
+          letterSpacing: layer.letterSpacing * w,
+          height: layer.lineHeight,
+          shadows: layer.hasShadow
+              ? [Shadow(
+                  color: _parseHexColor(layer.shadowColor),
+                  blurRadius: layer.shadowBlur * w,
+                  offset: Offset(layer.shadowOffsetX * w, layer.shadowOffsetY * h),
+                )]
+              : null,
+        );
+        return style;
+      } catch (_) {
+        // Not a Google Font — fall back to system font with the requested family name
+        return TextStyle(
+          fontFamily: mappedFont,
+          fontSize: layer.fontSize * w,
+          fontWeight: layer.fontWeight == 'bold' ? FontWeight.w700 : FontWeight.w400,
+          fontStyle: layer.fontStyle == 'italic' ? FontStyle.italic : FontStyle.normal,
+          decoration: layer.textDecoration == 'underline' ? TextDecoration.underline : TextDecoration.none,
+          color: _parseHexColor(layer.color),
+          letterSpacing: layer.letterSpacing * w,
+          height: layer.lineHeight,
+          shadows: layer.hasShadow
+              ? [Shadow(
+                  color: _parseHexColor(layer.shadowColor),
+                  blurRadius: layer.shadowBlur * w,
+                  offset: Offset(layer.shadowOffsetX * w, layer.shadowOffsetY * h),
+                )]
+              : null,
+        );
+      }
+    }
 
-                  final double scale = previewWidth / designWidth;
+    // Build content widget — support curved text, outline, plain
+    Widget buildTextContent({bool forOutline = false}) {
+      final style = forOutline
+          ? getBaseStyle().copyWith(
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = layer.outlineWidth * w * 2
+                ..color = _parseHexColor(layer.outlineColor),
+              color: null,
+            )
+          : getBaseStyle();
 
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: RepaintBoundary(
-                        key: _repaintKey,
-                        child: Container(
-                          width: previewWidth,
-                          height: previewHeight,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            color: widget.template.background.type == 'image' 
-                                ? Colors.white 
-                                : _parseHexColor(widget.template.background.value),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            children: [
-                              // Background image layer if applicable
-                              if (widget.template.background.type == 'image' && widget.template.background.value.startsWith('http'))
-                                Positioned.fill(
-                                  child: Image.network(
-                                    _resolveImageUrl(widget.template.background.value),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(color: Colors.white),
-                                  ),
-                                ),
+      if (layer.curveIntensity != 0.0) {
+        double radius = 15000 / (layer.curveIntensity.abs() < 1 ? 1 : layer.curveIntensity.abs());
+        return ArcText(
+          radius: radius,
+          text: displayContent,
+          textStyle: style,
+          startAngle: -3.14159 / 2,
+          startAngleAlignment: StartAngleAlignment.center,
+          placement: layer.curveIntensity > 0 ? Placement.outside : Placement.inside,
+          direction: layer.curveIntensity > 0 ? Direction.clockwise : Direction.counterClockwise,
+        );
+      }
+      return Text(displayContent, style: style, textAlign: align, softWrap: true);
+    }
 
-                              // Vector shapes layers
-                              ...widget.template.shapeLayers.map((shape) {
-                                final gradient = _parseCssGradient(shape.color);
-                                final isCircle = shape.shape == 'circle';
-                                final isTriangle = shape.shape == 'triangle';
-                                final isLine = shape.shape == 'line';
+    // Stack outline stroke behind fill text if outline is set
+    Widget contentWidget;
+    if (layer.outlineWidth > 0) {
+      contentWidget = Stack(children: [buildTextContent(forOutline: true), buildTextContent()]);
+    } else {
+      contentWidget = buildTextContent();
+    }
 
-                                Widget shapeWidget;
-                                if (isTriangle) {
-                                  shapeWidget = CustomPaint(
-                                    painter: TrianglePainter(
-                                      color: gradient == null ? _parseHexColor(shape.color) : _parseHexColor(shape.color),
-                                    ),
-                                    size: Size(shape.width * scale, shape.height * scale),
-                                  );
-                                } else if (isLine) {
-                                  shapeWidget = Center(
-                                    child: Container(
-                                      height: (shape.borderWidth > 0 ? shape.borderWidth : 4.0) * scale,
-                                      color: _parseHexColor(shape.color),
-                                    ),
-                                  );
-                                } else {
-                                  shapeWidget = Container(
-                                    decoration: BoxDecoration(
-                                      color: gradient == null ? _parseHexColor(shape.color) : null,
-                                      gradient: gradient,
-                                      shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-                                      borderRadius: isCircle ? null : _getShapeBorderRadius(shape.shape),
-                                      border: shape.borderWidth > 0
-                                          ? Border.all(
-                                              color: _parseHexColor(shape.borderColor),
-                                              width: shape.borderWidth * scale,
-                                            )
-                                          : null,
-                                    ),
-                                  );
-                                }
+    // Wrap with background color if set
+    Widget innerChild = contentWidget;
+    if (layer.textBackgroundColor.isNotEmpty) {
+      try {
+        final bgColor = _parseHexColor(layer.textBackgroundColor);
+        innerChild = Container(
+          color: bgColor.withOpacity(0.85),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: contentWidget,
+        );
+      } catch (_) {}
+    }
 
-                                return Positioned(
-                                  left: shape.x * scale,
-                                  top: shape.y * scale,
-                                  width: shape.width * scale,
-                                  height: shape.height * scale,
-                                  child: Transform.rotate(
-                                    angle: (shape.rotation * math.pi) / 180,
-                                    child: Opacity(
-                                      opacity: shape.opacity,
-                                      child: shapeWidget,
-                                    ),
-                                  ),
-                                );
-                              }),
+    // Wrap with Opacity and Flip Transformations
+    innerChild = Opacity(
+      opacity: layer.opacity,
+      child: Transform.scale(
+        scaleX: layer.flipHorizontal ? -1.0 : 1.0,
+        scaleY: layer.flipVertical ? -1.0 : 1.0,
+        child: innerChild,
+      ),
+    );
 
-                              // Image frames and photo slots
-                              ...widget.template.imageLayers.map((img) {
-                                final isCircle = img.maskShape == 'circle';
-                                return Positioned(
-                                  left: img.x * scale,
-                                  top: img.y * scale,
-                                  width: img.width * scale,
-                                  height: img.height * scale,
-                                  child: Transform.rotate(
-                                    angle: (img.rotation * math.pi) / 180,
-                                    child: Opacity(
-                                      opacity: img.opacity,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-                                          borderRadius: isCircle ? null : _getShapeBorderRadius(img.maskShape),
-                                          border: img.borderWidth > 0
-                                              ? Border.all(
-                                                  color: _parseHexColor(img.borderColor),
-                                                  width: img.borderWidth * scale,
-                                                )
-                                              : null,
-                                        ),
-                                        clipBehavior: Clip.antiAlias,
-                                        child: _localPhotoPath != null
-                                            ? Image.file(
-                                                File(_localPhotoPath!),
-                                                fit: BoxFit.cover,
-                                              )
-                                            : (img.url.startsWith('http')
-                                                ? Image.network(
-                                                    _resolveImageUrl(img.url),
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, __, ___) => Container(color: AppTheme.borderSoft),
-                                                  )
-                                                : Container(
-                                                    color: AppTheme.borderSoft,
-                                                    child: const Icon(
-                                                      Icons.person_rounded,
-                                                      color: AppTheme.textSecondary,
-                                                      size: 40,
-                                                    ),
-                                                  )),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }),
+    // elementType mapping by layer index position
+    final layerIndex = widget.template.textLayers.indexOf(layer);
+    final elementType = layerIndex == 0
+        ? SelectedElementType.header
+        : layerIndex == 1
+            ? SelectedElementType.name
+            : layerIndex == 2
+                ? SelectedElementType.dates
+                : SelectedElementType.tribute;
 
-                              // Text layers (name and dates are dynamically updated by local states)
-                              ..._textLayers.map((text) {
-                                // Dynamically replace default texts with customized user inputs
-                                // Dynamically replace default texts with customized user inputs
-                                String displayContent = text.content;
-                                if (text.id == '1') {
-                                  displayContent = _startingLine;
-                                } else if (text.id == '2') {
-                                  displayContent = _deceasedName;
-                                } else if (text.id == 'date') {
-                                  displayContent = _lifespanDates;
-                                } else if (text.id == 'message') {
-                                  displayContent = _messageContent;
-                                }
-
-                                final isBold = text.fontWeight == 'bold';
-                                final isItalic = text.fontStyle == 'italic';
-                                final isUnderline = text.textDecoration == 'underline';
-
-                                final isAutoWidth = text.width < 150;
-                                final double? renderWidth = isAutoWidth ? null : text.width * scale;
-                                final double? renderHeight = isAutoWidth ? null : text.height * scale;
-
-                                return Positioned(
-                                  left: text.x * scale,
-                                  top: text.y * scale,
-                                  width: renderWidth,
-                                  child: Transform.rotate(
-                                    angle: (text.rotation * math.pi) / 180,
-                                    child: Opacity(
-                                      opacity: text.opacity,
-                                      child: isAutoWidth
-                                          ? Text(
-                                              displayContent,
-                                              textAlign: text.alignment == 'left'
-                                                  ? TextAlign.left
-                                                  : text.alignment == 'right'
-                                                      ? TextAlign.right
-                                                      : TextAlign.center,
-                                              style: _getTextStyle(text, scale, isBold, isItalic, isUnderline),
-                                            )
-                                          : SizedBox(
-                                              width: renderWidth,
-                                              child: Align(
-                                                alignment: text.alignment == 'left'
-                                                    ? Alignment.centerLeft
-                                                    : text.alignment == 'right'
-                                                        ? Alignment.centerRight
-                                                        : Alignment.center,
-                                                child: Text(
-                                                  displayContent,
-                                                  textAlign: text.alignment == 'left'
-                                                      ? TextAlign.left
-                                                      : text.alignment == 'right'
-                                                          ? TextAlign.right
-                                                          : TextAlign.center,
-                                                  style: _getTextStyle(text, scale, isBold, isItalic, isUnderline),
-                                                ),
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // Bottom Editor Form Panel
-            Container(
-              height: MediaQuery.of(context).size.height * 0.45,
-              padding: const EdgeInsets.all(16.0),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
+    return Positioned(
+      left: layer.x * w,
+      top: layer.y * h,
+      width: layer.width * w,
+      // No fixed height — web uses overflow:visible; canvas Clip.hardEdge handles boundary
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            if (_activeTextLayer?.id == layer.id) {
+              _activeTextLayer = null;
+              _selectedType = SelectedElementType.none;
+              _activeTray = ActiveTrayType.none;
+            } else {
+              _activeTextLayer = layer;
+              _selectedType = elementType;
+              _selectedOverlayId = null;
+              _openIntegratedTextTrayFor(elementType);
+            }
+          });
+        },
+        onPanUpdate: (details) {
+          _handlePanUpdate(layer, details, w, h);
+        },
+        onPanEnd: (details) {
+          if (!layer.locked) _saveState();
+        },
+        // Only apply selection decoration when selected
+        child: isSelected
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: _limeAccent, width: 2.5),
+                  borderRadius: BorderRadius.circular(6),
+                  color: _limeAccent.withOpacity(0.18),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x0F000000),
-                    blurRadius: 10,
-                    offset: Offset(0, -4),
+                child: innerChild,
+              )
+            : innerChild,
+      ),
+    );
+  }
+
+
+  // SELECTABLE PHOTO WITH LIME GREEN BOUNDING BOX + ITEM 8 CUSTOM FRAME IMAGE
+  Widget _buildSelectablePhoto({required ImageLayer layer}) {
+    final isSelected = _selectedType == SelectedElementType.photo && !layer.locked;
+    final w = widget.template.width;
+    final h = widget.template.height;
+
+    // 0=Circle, 1=Oval, 2=Rounded Square, 3=Arch, 4=Soft Hex, 5=Custom Frame
+    // We already initialized _frameShapeIndex from maskShape in initState.
+    // Now we must always respect _frameShapeIndex so the user's manual selection works.
+    final effectiveShapeIndex = _frameShapeIndex;
+
+    BorderRadius getRadius() {
+      if (effectiveShapeIndex == 0) return BorderRadius.circular(9999); // pure circle via ClipOval below
+      if (effectiveShapeIndex == 1) {
+        return const BorderRadius.all(Radius.elliptical(120, 160));
+      }
+      if (effectiveShapeIndex == 2) return BorderRadius.circular(24);
+      if (effectiveShapeIndex == 3) {
+        return const BorderRadius.only(
+          topLeft: Radius.circular(100),
+          topRight: Radius.circular(100),
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        );
+      }
+      if (effectiveShapeIndex == 4) return BorderRadius.circular(44);
+      return BorderRadius.circular(_customBorderRadius);
+    }
+
+    final isCircle = effectiveShapeIndex == 0;
+
+    Widget clipContent = isCircle
+        ? ClipOval(child: _buildPhotoContent(layer))
+        : ClipRRect(borderRadius: getRadius(), child: _buildPhotoContent(layer));
+
+    clipContent = Opacity(
+      opacity: layer.opacity,
+      child: Transform.scale(
+        scaleX: layer.flipHorizontal ? -1.0 : 1.0,
+        scaleY: layer.flipVertical ? -1.0 : 1.0,
+        child: clipContent,
+      ),
+    );
+
+    return Positioned(
+      left: layer.x * w,
+      top: layer.y * h,
+      width: layer.width * w,
+      height: layer.height * h,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            if (_selectedType == SelectedElementType.photo) {
+              _selectedType = SelectedElementType.none;
+              _selectedOverlayId = null;
+              _activeTray = ActiveTrayType.none;
+            } else {
+              _selectedType = SelectedElementType.photo;
+              _selectedOverlayId = null;
+              _activeTray = ActiveTrayType.photo;
+            }
+          });
+        },
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: layer.width * w,
+              height: layer.height * h,
+              // FIX #5: No hardcoded padding — it shrinks the clip area and creates a ring
+              decoration: isSelected
+                  ? BoxDecoration(
+                      border: Border.all(color: _limeAccent, width: 3),
+                      shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+                      borderRadius: isCircle ? null : getRadius(),
+                      color: _limeAccent.withOpacity(0.18),
+                    )
+                  : BoxDecoration(
+                      shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+                      borderRadius: isCircle ? null : getRadius(),
+                      border: Border.all(color: Colors.transparent, width: 0),
+                    ),
+              child: clipContent,
+            ),
+            // Item 8: Custom Uploaded Frame Border Overlay
+            if (effectiveShapeIndex == 5 && _customFrameImagePath != null)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: getRadius(),
+                  child: Image.file(
+                    File(_customFrameImagePath!),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
-                ],
+                ),
               ),
-              child: SafeArea(
-                top: false,
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    // Row for Photo Upload Button
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppTheme.sunlitCream,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: _localPhotoPath != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                File(_localPhotoPath!),
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.photo_library_rounded,
-                              color: AppTheme.terracotta,
-                            ),
+            if (isSelected)
+              Positioned(
+                right: -12,
+                top: -12,
+                child: GestureDetector(
+                  onTap: _deleteSelectedElement,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
                     ),
-                    title: const Text(
-                      'Cherished Photograph',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    subtitle: const Text(
-                      'Choose a photo to insert into the frame',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    trailing: ElevatedButton(
-                      onPressed: _pickPhoto,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      ),
-                      child: const Text('Choose'),
-                    ),
-                  ),
-                  const Divider(color: AppTheme.borderSoft),
-                  const SizedBox(height: 12),
-
-                  // Starting Line Field
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            labelText: "Starting Line",
-                            prefixIcon: Icon(Icons.format_quote_rounded, color: AppTheme.textSecondary),
-                          ),
-                          controller: _startingLineController,
-                          onChanged: (val) {
-                            setState(() {
-                              _startingLine = val;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => _openTextEditor('1'),
-                        icon: const Icon(Icons.format_paint_rounded, color: AppTheme.terracotta),
-                        tooltip: 'Edit Style',
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppTheme.terracotta.withOpacity(0.1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.all(14),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Name Field
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            labelText: "Deceased's Name",
-                            prefixIcon: Icon(Icons.person_outline_rounded, color: AppTheme.textSecondary),
-                          ),
-                          controller: _nameController,
-                          onChanged: (val) {
-                            setState(() {
-                              _deceasedName = val;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => _openTextEditor('2'),
-                        icon: const Icon(Icons.format_paint_rounded, color: AppTheme.terracotta),
-                        tooltip: 'Edit Style',
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppTheme.terracotta.withOpacity(0.1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.all(14),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Dates Field
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            labelText: "Lifespan Dates",
-                            prefixIcon: Icon(Icons.calendar_month_outlined, color: AppTheme.textSecondary),
-                          ),
-                          controller: _datesController,
-                          onChanged: (val) {
-                            setState(() {
-                              _lifespanDates = val;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => _openTextEditor('date'),
-                        icon: const Icon(Icons.format_paint_rounded, color: AppTheme.terracotta),
-                        tooltip: 'Edit Style',
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppTheme.terracotta.withOpacity(0.1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.all(14),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Message Field
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            labelText: "Tribute Message",
-                            prefixIcon: Icon(Icons.message_outlined, color: AppTheme.textSecondary),
-                          ),
-                          controller: _messageController,
-                          maxLines: 3,
-                          minLines: 1,
-                          onChanged: (val) {
-                            setState(() {
-                              _messageContent = val;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => _openTextEditor('message'),
-                        icon: const Icon(Icons.format_paint_rounded, color: AppTheme.terracotta),
-                        tooltip: 'Edit Style',
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppTheme.terracotta.withOpacity(0.1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.all(14),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Export Action Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _isExporting ? null : _shareTribute,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.terracotta,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: _isExporting
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.arrow_forward_rounded),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Generate Tribute & Export',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                    ],
+                    padding: const EdgeInsets.all(4),
+                    child: const Icon(Icons.close, color: Colors.white, size: 16),
                   ),
                 ),
               ),
@@ -786,25 +1509,2001 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
     );
   }
-}
 
-class TrianglePainter extends CustomPainter {
-  final Color color;
-  TrianglePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final path = Path()
-      ..moveTo(size.width / 2, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(path, paint);
+  Widget _buildPhotoContent(ImageLayer layer) {
+    if (_localPhotoPath != null) {
+      return Image.file(
+        File(_localPhotoPath!),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPortraitPlaceholder(),
+      );
+    }
+    
+    // Check if the template has a remote URL for the frame
+    final resolvedUrl = ApiService.resolveImageUrl(layer.url);
+    if (resolvedUrl.isNotEmpty) {
+      return Image.network(
+        resolvedUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPortraitPlaceholder(),
+      );
+    }
+    
+    return _buildPortraitPlaceholder();
   }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  // Item 4: Generous interior padding & centered text so it never clips any shape edge!
+  Widget _buildPortraitPlaceholder() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF2C353F), Color(0xFF1E242B)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.person_rounded,
+            size: 52,
+            color: AppTheme.goldAccent.withOpacity(0.85),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Tap to\nUpload',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // DRAGGABLE FLORAL IMAGE OVERLAYS (or legacy icon overlays)
+  Widget _buildSingleOverlayWidget(CanvasOverlayItem item) {
+      final isSelected = _selectedType == SelectedElementType.overlay &&
+          _selectedOverlayId == item.id && !item.locked;
+      final w = widget.template.width;
+      final h = widget.template.height;
+
+      Widget overlayChild;
+      if (item.graphic.isImageOverlay) {
+        // Real PNG floral image from backend — match web's object-fit:contain + multiply blend
+        final imageUrl = '${ApiService.baseUrl}/flowers/${item.graphic.imageFile}';
+        final imgW = w * 0.9 * item.scale;
+        final imgH = h * 0.9 * item.scale;
+        overlayChild = SizedBox(
+          width: imgW,
+          height: imgH,
+          child: Opacity(
+            opacity: item.opacity,
+            child: Transform.scale(
+              scaleX: item.flipHorizontal ? -1.0 : 1.0,
+              scaleY: item.flipVertical ? -1.0 : 1.0,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                // Apply multiply blend mode to match web dashboard's mix-blend-mode: multiply
+                color: Colors.black.withOpacity(0.0), // transparent tint
+                colorBlendMode: BlendMode.multiply,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        );
+      } else {
+        // Legacy icon overlay
+        overlayChild = Icon(
+          item.graphic.iconData ?? Icons.star_rounded,
+          size: item.graphic.defaultSize * item.scale,
+          color: item.color,
+        );
+      }
+
+      return Positioned(
+        left: item.position.dx,
+        top: item.position.dy,
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              if (_selectedType == SelectedElementType.overlay && _selectedOverlayId == item.id) {
+                _selectedType = SelectedElementType.none;
+                _selectedOverlayId = null;
+                _activeTray = ActiveTrayType.none;
+              } else {
+                _selectedType = SelectedElementType.overlay;
+                _selectedOverlayId = item.id;
+                if (!item.graphic.isImageOverlay) {
+                  _activeTray = ActiveTrayType.colors;
+                }
+              }
+            });
+          },
+          onPanUpdate: (details) {
+            _handlePanUpdate(item, details, w, h);
+          },
+          onPanEnd: (details) {
+            if (!item.locked) _saveState();
+          },
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: isSelected
+                ? BoxDecoration(
+                    border: Border.all(color: _limeAccent, width: 2.5),
+                    borderRadius: BorderRadius.circular(8),
+                    color: _limeAccent.withOpacity(0.12),
+                  )
+                : null,
+            child: overlayChild,
+          ),
+        ),
+      );
+    }
+
+  void _handlePanUpdate(dynamic layer, DragUpdateDetails details, double w, double h) {
+    if (layer.locked) return;
+    
+    final dx = details.delta.dx / w;
+    final dy = details.delta.dy / h;
+    final absDx = details.delta.dx;
+    final absDy = details.delta.dy;
+
+    setState(() {
+      final groupId = layer.groupId;
+      if (groupId != null && groupId.isNotEmpty) {
+        // Move all items in this group
+        for (var l in widget.template.imageLayers) {
+          if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
+        }
+        for (var l in widget.template.shapeLayers) {
+          if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
+        }
+        for (var l in widget.template.textLayers) {
+          if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
+        }
+        for (var l in _overlayItems) {
+          if (l.groupId == groupId && !l.locked) { l.position = Offset(l.position.dx + absDx, l.position.dy + absDy); }
+        }
+      } else {
+        // Move only this item
+        if (layer is CanvasOverlayItem) {
+          layer.position = Offset(layer.position.dx + absDx, layer.position.dy + absDy);
+        } else {
+          layer.x += dx;
+          layer.y += dy;
+        }
+      }
+    });
+  }
+
+  // DYNAMIC HEIGHT INTEGRATED TRAY (White + Lime Green Theme)
+  Widget _buildActiveTrayPanel() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      height: _getTrayHeight(context),
+      decoration: const BoxDecoration(
+        color: Colors.white, // Crisp White Light Theme!
+        border: Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+        ),
+      ),
+      child: _buildTrayContent(),
+    );
+  }
+
+  Widget _buildTrayContent() {
+    switch (_activeTray) {
+      case ActiveTrayType.templates:
+        return _buildTemplatesTray();
+      case ActiveTrayType.verses:
+        return _buildVersesTray();
+      case ActiveTrayType.flowers:
+        return _buildFlowersTray();
+      case ActiveTrayType.text:
+        return _buildTextTray();
+      case ActiveTrayType.frame:
+        return _buildFrameShapeTray();
+      case ActiveTrayType.photo:
+        return _buildPhotoTray();
+      case ActiveTrayType.background:
+        return _buildBackgroundTray(); // Item 10: Dedicated Background tool
+      case ActiveTrayType.fonts:
+        return _buildFontsTray();
+      case ActiveTrayType.colors:
+        return _buildColorsTray();
+      case ActiveTrayType.theme:
+        return _buildThemeTray();
+      case ActiveTrayType.overlay:
+        return _buildOverlayTray();
+      case ActiveTrayType.none:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildOverlayTray() {
+    final item = _currentOverlay;
+    if (item == null) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: const Color(0xFFF8FAFC),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.photo_size_select_large_rounded, color: _darkBlack, size: 20),
+              const SizedBox(width: 8),
+              const Text('Sticker Size', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              const Spacer(),
+              Text('${(item.scale * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.w800, color: _limeAccent, fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 6,
+              activeTrackColor: _darkBlack,
+              inactiveTrackColor: const Color(0xFFE2E8F0),
+              thumbColor: _limeAccent,
+              overlayColor: _limeAccent.withOpacity(0.2),
+            ),
+            child: Slider(
+              min: 0.1,
+              max: item.graphic.isImageOverlay ? 5.0 : 3.0,
+              value: item.scale,
+              onChanged: (val) {
+                setState(() => item.scale = val);
+              },
+              onChangeEnd: (_) => _saveState(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 1. TEMPLATES TRAY (Crisp Light Theme + Lime Green Accent)
+  Widget _buildTemplatesTray() {
+    return FutureBuilder<List<Template>>(
+      future: ApiService.fetchTemplates(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final templates = snapshot.data!;
+        return ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          itemCount: templates.length,
+          itemBuilder: (context, idx) {
+            final t = templates[idx];
+            return GestureDetector(
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => EditorScreen(template: t)),
+                );
+              },
+              child: Container(
+                width: 120,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9), // Light slate card
+                  border: Border.all(color: _darkBlack, width: 1.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.style_rounded, color: _darkBlack, size: 32),
+                    const SizedBox(height: 8),
+                    Text(
+                      t.title,
+                      style: const TextStyle(color: _darkBlack, fontWeight: FontWeight.w800, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 2. VERSES TRAY (Item 2: Tick button & card change into solid dark color when selected!)
+  Widget _buildVersesTray() {
+    const allVerses = MemorialElementsLibrary.verses;
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemCount: allVerses.length,
+      itemBuilder: (context, idx) {
+        final verse = allVerses[idx];
+        final isSelected = _messageContent == verse.text;
+        return Card(
+          color: isSelected ? _limeAccent.withOpacity(0.2) : const Color(0xFFF8FAFC),
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: 6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(
+              color: isSelected ? _darkBlack : const Color(0xFFE2E8F0),
+              width: isSelected ? 2.0 : 1.0,
+            ),
+          ),
+          child: ListTile(
+            dense: true,
+            title: Text(
+              verse.title,
+              style: const TextStyle(color: _darkBlack, fontWeight: FontWeight.w800, fontSize: 13),
+            ),
+            subtitle: Text(
+              '"${verse.text}"',
+              style: const TextStyle(color: Color(0xFF334155), fontSize: 11),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            // Item 2: Solid dark black tick inside a vibrant lime green circle badge when selected!
+            trailing: isSelected
+                ? Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: _limeAccent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _darkBlack, width: 1.5),
+                    ),
+                    child: const Icon(Icons.check_rounded, color: Colors.black, size: 16),
+                  )
+                : const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF94A3B8), size: 20),
+            onTap: () {
+              setState(() => _messageContent = verse.text);
+              _updateActiveTextProperty((layer) => layer.content = verse.text);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // 3. FLOWERS TRAY — Real floral images from the backend (matches web dashboard)
+  Widget _buildFlowersTray() {
+    const allGraphics = MemorialElementsLibrary.graphics;
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,       // 2 columns — same as web dashboard grid
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.3,   // Landscape card to show image comfortably
+      ),
+      itemCount: allGraphics.length,
+      itemBuilder: (context, idx) {
+        final g = allGraphics[idx];
+        final imageUrl = '${ApiService.baseUrl}/flowers/${g.imageFile}';
+        return InkWell(
+          onTap: () => _addOverlayGraphic(g),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Checkerboard bg to show transparency of floral PNGs
+                Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFE8E8E8), Color(0xFFF5F5F5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+                // Actual floral image from backend
+                Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.local_florist_rounded, size: 40, color: Color(0xFF94A3B8)),
+                  ),
+                ),
+                // Label at the bottom
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.92),
+                      border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+                    ),
+                    child: Text(
+                      g.name,
+                      style: const TextStyle(
+                        color: Color(0xFF1E293B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _updateSelectedTextContent(String val) {
+    setState(() {
+      if (_selectedType == SelectedElementType.header) _startingLine = val;
+      if (_selectedType == SelectedElementType.name) _deceasedName = val;
+      if (_selectedType == SelectedElementType.dates) _lifespanDates = val;
+      if (_selectedType == SelectedElementType.tribute || _selectedType == SelectedElementType.none) {
+        _messageContent = val;
+      }
+      if (_activeTextLayer != null) {
+        _activeTextLayer!.content = val;
+      }
+    });
+  }
+
+  void _updateActiveTextProperty(void Function(TextLayer) update, {bool saveState = true}) {
+    TextLayer? targetLayer = _activeTextLayer;
+    if (targetLayer == null) {
+      if (_selectedType == SelectedElementType.header && widget.template.textLayers.isNotEmpty) targetLayer = widget.template.textLayers[0];
+      else if (_selectedType == SelectedElementType.name && widget.template.textLayers.length > 1) targetLayer = widget.template.textLayers[1];
+      else if (_selectedType == SelectedElementType.dates && widget.template.textLayers.length > 2) targetLayer = widget.template.textLayers[2];
+      else if (_selectedType == SelectedElementType.tribute && widget.template.textLayers.length > 3) targetLayer = widget.template.textLayers[3];
+    }
+    
+    if (targetLayer != null) {
+      setState(() {
+        update(targetLayer!);
+      });
+      if (saveState) {
+        _saveState();
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a text element on the canvas first.', style: TextStyle(fontWeight: FontWeight.w600)),
+          backgroundColor: Colors.black87,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  // Item 7: SCROLLABLE CANVA-STYLE TEXT TYPOGRAPHY SUITE
+  Widget _buildTextTray() {
+    final currentType = _selectedType != SelectedElementType.none &&
+            _textStyles.containsKey(_selectedType)
+        ? _selectedType
+        : SelectedElementType.tribute;
+    final style = _textStyles[currentType]!;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Section 1: Prominent multi-line text input field
+          TextField(
+            controller: _textEditingController,
+            style: const TextStyle(color: _darkBlack, fontSize: 14, fontWeight: FontWeight.w700),
+            maxLines: 2,
+            decoration: InputDecoration(
+              hintText: 'Type your text here...',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              filled: true,
+              fillColor: const Color(0xFFF1F5F9),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _darkBlack, width: 1.5),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _darkBlack, width: 1.5),
+              ),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.clear, color: _darkBlack, size: 18),
+                onPressed: () {
+                  _textEditingController.clear();
+                  _updateSelectedTextContent('');
+                },
+              ),
+            ),
+            onChanged: (val) {
+              _updateSelectedTextContent(val);
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Section 2: Quick Font Name Button & Quick Color Swatch Button
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _activeTray = ActiveTrayType.fonts),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    foregroundColor: _darkBlack,
+                    elevation: 0,
+                    minimumSize: const Size(0, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: _darkBlack, width: 1.5),
+                    ),
+                  ),
+                  icon: const Icon(Icons.font_download_outlined, size: 18, color: _darkBlack),
+                  label: Text(
+                    'Font: ${style.font}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _activeTray = ActiveTrayType.colors),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    foregroundColor: _darkBlack,
+                    elevation: 0,
+                    minimumSize: const Size(0, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: _darkBlack, width: 1.5),
+                    ),
+                  ),
+                  icon: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: style.color,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _darkBlack, width: 1),
+                    ),
+                  ),
+                  label: const Text('Color', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Section 3: Font Size Control with smooth Slider and - / + steps
+          Row(
+            children: [
+              const Text('Size:', style: TextStyle(color: _darkBlack, fontSize: 13, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 8),
+              _buildLargeActionBtn(
+                icon: Icons.remove_rounded,
+                onTap: () => _changeTextSize(-2.0),
+              ),
+              Expanded(
+                child: Slider(
+                  value: style.size.clamp(12.0, 64.0),
+                  min: 12.0,
+                  max: 64.0,
+                  activeColor: _darkBlack,
+                  thumbColor: _limeAccent,
+                  inactiveColor: const Color(0xFFE2E8F0),
+                  onChanged: (val) {
+                    setState(() => style.size = val);
+                    _updateActiveTextProperty((layer) {
+                      layer.fontSize = val / 1080;
+                    }, saveState: false);
+                  },
+                  onChangeEnd: (_) => _saveState(),
+                ),
+              ),
+              _buildLargeActionBtn(
+                icon: Icons.add_rounded,
+                onTap: () => _changeTextSize(2.0),
+              ),
+              const SizedBox(width: 8),
+              Text('${style.size.toInt()}pt', style: const TextStyle(color: _darkBlack, fontSize: 13, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Section 4: Formatting (B, I, U, AA) & Alignment (Left, Center, Right)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildStyleToggle(
+                    icon: Icons.format_align_left_rounded,
+                    isActive: style.align == TextAlign.left,
+                    onTap: () {
+                      setState(() => style.align = TextAlign.left);
+                      _updateActiveTextProperty((layer) => layer.alignment = 'left');
+                    },
+                  ),
+                  _buildStyleToggle(
+                    icon: Icons.format_align_center_rounded,
+                    isActive: style.align == TextAlign.center,
+                    onTap: () {
+                      setState(() => style.align = TextAlign.center);
+                      _updateActiveTextProperty((layer) => layer.alignment = 'center');
+                    },
+                  ),
+                  _buildStyleToggle(
+                    icon: Icons.format_align_right_rounded,
+                    isActive: style.align == TextAlign.right,
+                    onTap: () {
+                      setState(() => style.align = TextAlign.right);
+                      _updateActiveTextProperty((layer) => layer.alignment = 'right');
+                    },
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildStyleToggle(
+                    icon: Icons.format_bold_rounded,
+                    isActive: style.bold,
+                    onTap: () {
+                      setState(() => style.bold = !style.bold);
+                      _updateActiveTextProperty((layer) => layer.fontWeight = style.bold ? 'bold' : 'normal');
+                    },
+                  ),
+                  _buildStyleToggle(
+                    icon: Icons.format_italic_rounded,
+                    isActive: style.italic,
+                    onTap: () {
+                      setState(() => style.italic = !style.italic);
+                      _updateActiveTextProperty((layer) => layer.fontStyle = style.italic ? 'italic' : 'normal');
+                    },
+                  ),
+                  _buildStyleToggle(
+                    icon: Icons.format_underlined_rounded,
+                    isActive: style.underline,
+                    onTap: () {
+                      setState(() => style.underline = !style.underline);
+                      _updateActiveTextProperty((layer) => layer.textDecoration = style.underline ? 'underline' : 'none');
+                    },
+                  ),
+                  _buildStyleToggle(
+                    icon: Icons.keyboard_capslock_rounded,
+                    isActive: style.uppercase,
+                    onTap: () {
+                      setState(() => style.uppercase = !style.uppercase);
+                      _updateActiveTextProperty((layer) => layer.textTransform = style.uppercase ? 'uppercase' : 'none');
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Section 5: Interactive Sliders for Letter Spacing and Line Height
+          Row(
+            children: [
+              const Text('Spacing:', style: TextStyle(color: _darkBlack, fontSize: 12, fontWeight: FontWeight.w800)),
+              Expanded(
+                child: Slider(
+                  value: style.letterSpacing,
+                  min: 0.0,
+                  max: 10.0,
+                  activeColor: _darkBlack,
+                  thumbColor: _limeAccent,
+                  inactiveColor: const Color(0xFFE2E8F0),
+                  onChanged: (val) {
+                    setState(() => style.letterSpacing = val);
+                    _updateActiveTextProperty((layer) => layer.letterSpacing = val / widget.template.width, saveState: false);
+                  },
+                  onChangeEnd: (_) => _saveState(),
+                ),
+              ),
+              Text(style.letterSpacing.toStringAsFixed(1), style: const TextStyle(color: _darkBlack, fontSize: 12, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 14),
+              const Text('Line:', style: TextStyle(color: _darkBlack, fontSize: 12, fontWeight: FontWeight.w800)),
+              Expanded(
+                child: Slider(
+                  value: style.lineHeight,
+                  min: 1.0,
+                  max: 2.5,
+                  activeColor: _darkBlack,
+                  thumbColor: _limeAccent,
+                  inactiveColor: const Color(0xFFE2E8F0),
+                  onChanged: (val) {
+                    setState(() => style.lineHeight = val);
+                    _updateActiveTextProperty((layer) => layer.lineHeight = val, saveState: false);
+                  },
+                  onChangeEnd: (_) => _saveState(),
+                ),
+              ),
+              Text(style.lineHeight.toStringAsFixed(1), style: const TextStyle(color: _darkBlack, fontSize: 12, fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLargeActionBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          border: Border.all(color: _darkBlack, width: 1.5),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: _darkBlack, size: 18),
+      ),
+    );
+  }
+
+  // Item 6: Inactive = Dark Slate Border, Active = Lime Green Fill WITH Dark Slate Border
+  Widget _buildStyleToggle({
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: isActive ? _limeAccent : const Color(0xFFF1F5F9),
+            border: Border.all(
+              color: _darkBlack,
+              width: isActive ? 2.0 : 1.5,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: isActive ? Colors.black : const Color(0xFF475569),
+            size: 18,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openIntegratedTextTrayFor(SelectedElementType type) {
+    setState(() {
+      _activeTray = ActiveTrayType.text;
+      if (type == SelectedElementType.header) _textEditingController.text = _startingLine;
+      if (type == SelectedElementType.name) _textEditingController.text = _deceasedName;
+      if (type == SelectedElementType.dates) _textEditingController.text = _lifespanDates;
+      if (type == SelectedElementType.tribute) _textEditingController.text = _messageContent;
+      
+      if (_activeTextLayer != null) {
+        _textEditingController.text = _activeTextLayer!.content;
+      }
+    });
+  }
+
+  // Item 8: FRAME SHAPE TRAY ("Custom" means upload custom frame border image!)
+  Widget _buildFrameShapeTray() {
+    final frames = [
+      {'name': 'Circle', 'icon': Icons.circle_outlined},
+      {'name': 'Oval', 'icon': Icons.crop_portrait_rounded},
+      {'name': 'Square', 'icon': Icons.crop_square_rounded},
+      {'name': 'Arch', 'icon': Icons.architecture_rounded},
+      {'name': 'Diamond', 'icon': Icons.diamond_outlined},
+      {'name': 'Custom', 'icon': Icons.add_photo_alternate_rounded}, // Upload custom frame!
+    ];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            itemCount: frames.length,
+            itemBuilder: (context, idx) {
+              final frame = frames[idx];
+              final isSel = _frameShapeIndex == idx;
+              return GestureDetector(
+                onTap: () {
+                  if (idx == 5) {
+                    _pickCustomFrameImage();
+                  } else {
+                    setState(() => _frameShapeIndex = idx);
+                    _saveState();
+                  }
+                },
+                child: Container(
+                  width: 80,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: isSel ? _limeAccent : const Color(0xFFF1F5F9),
+                    border: Border.all(
+                      color: _darkBlack,
+                      width: isSel ? 2.0 : 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(frame['icon'] as IconData, color: isSel ? Colors.black : const Color(0xFF475569), size: 26),
+                      const SizedBox(height: 4),
+                      Text(
+                        frame['name'] as String,
+                        style: TextStyle(
+                          color: isSel ? Colors.black : const Color(0xFF0F172A),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        if (_frameShapeIndex == 5)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _pickCustomFrameImage,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _limeAccent,
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: const BorderSide(color: _darkBlack, width: 1.5),
+                      ),
+                    ),
+                    icon: const Icon(Icons.upload_file_rounded, size: 18),
+                    label: Text(
+                      _customFrameImagePath != null ? 'Frame Uploaded (Tap to change)' : 'Upload Frame from Gallery',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 6. PHOTO TRAY (Crisp Light Theme + Lime Green Button)
+  Widget _buildPhotoTray() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: ElevatedButton.icon(
+          onPressed: _pickPhoto,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _limeAccent, // Vibrant Lime Green Accent
+            foregroundColor: Colors.black, // Crisp Bold Black text
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: _darkBlack, width: 1.5),
+            ),
+          ),
+          icon: const Icon(Icons.photo_library_rounded, size: 22),
+          label: const Text(
+            'Select Portrait Photo',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Item 10: DEDICATED BACKGROUND TRAY
+  Widget _buildBackgroundTray() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _pickBackgroundPhoto,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _limeAccent,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: _darkBlack, width: 1.5),
+                  ),
+                ),
+                icon: const Icon(Icons.wallpaper_rounded, size: 20),
+                label: const Text(
+                  'Upload Background Photo',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => setState(() => _activeTray = ActiveTrayType.theme),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  foregroundColor: _darkBlack,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: _darkBlack, width: 1.5),
+                  ),
+                ),
+                icon: const Icon(Icons.color_lens_outlined, size: 20),
+                label: const Text(
+                  'Color Tints & Palettes',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Item 3: FONTS TRAY (Includes "← Back to Text Settings" button!)
+  Widget _buildFontsTray() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: const Color(0xFFF8FAFC),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: () => setState(() => _activeTray = ActiveTrayType.text),
+                child: Row(
+                  children: [
+                    const Icon(Icons.arrow_back_rounded, color: _darkBlack, size: 18),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Back to Text Settings',
+                      style: TextStyle(color: _darkBlack, fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: allWebGoogleFonts.length,
+            itemBuilder: (context, idx) {
+              final font = allWebGoogleFonts[idx];
+              final isSel = _isFontSelected(font);
+              return ListTile(
+                dense: true,
+                title: Text(
+                  font,
+                  style: TextStyle(
+                    color: isSel ? _darkBlack : const Color(0xFF0F172A),
+                    fontSize: 15,
+                    fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
+                  ),
+                ),
+                trailing: isSel
+                    ? Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: _limeAccent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_rounded, color: Colors.black, size: 16),
+                      )
+                    : null,
+                onTap: () {
+                  setState(() {
+                    if (_selectedType == SelectedElementType.header) _textStyles[SelectedElementType.header]!.font = font;
+                    if (_selectedType == SelectedElementType.name) _textStyles[SelectedElementType.name]!.font = font;
+                    if (_selectedType == SelectedElementType.dates) _textStyles[SelectedElementType.dates]!.font = font;
+                    if (_selectedType == SelectedElementType.tribute) _textStyles[SelectedElementType.tribute]!.font = font;
+                  });
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool _isFontSelected(String font) {
+    if (_textStyles.containsKey(_selectedType)) {
+      return _textStyles[_selectedType]!.font == font;
+    }
+    return false;
+  }
+
+  // Item 3: COLORS TRAY (Includes "← Back to Text Settings" button!)
+  Widget _buildColorsTray() {
+    final colors = [
+      const Color(0xFF1B2430),
+      const Color(0xFF3B4856),
+      const Color(0xFFBAFF00), // Lime green in palette too!
+      const Color(0xFFD4AF37),
+      const Color(0xFF8B5A5A),
+      const Color(0xFF2C5E3B),
+      const Color(0xFF4A5568),
+      const Color(0xFFFFFFFF),
+      const Color(0xFF000000),
+    ];
+    return Column(
+      children: [
+        if (_selectedType != SelectedElementType.overlay)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: const Color(0xFFF8FAFC),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () => setState(() => _activeTray = ActiveTrayType.text),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.arrow_back_rounded, color: _darkBlack, size: 18),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Back to Text Settings',
+                        style: TextStyle(color: _darkBlack, fontWeight: FontWeight.w800, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: colors.map((c) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (_textStyles.containsKey(_selectedType)) {
+                          _textStyles[_selectedType]!.color = c;
+                        }
+                        if (_selectedType == SelectedElementType.overlay) {
+                          final ov = _currentOverlay;
+                          if (ov != null) ov.color = c;
+                        }
+                      });
+                      _updateActiveTextProperty((layer) {
+                        layer.color = '#${c.value.toRadixString(16).substring(2).toUpperCase()}';
+                      });
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _darkBlack, width: 2),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Item 5 & 9: SNUG THEME TRAY WITH CUSTOM COLOR PICKER BAR (Zero bottom empty space!)
+  Widget _buildThemeTray() {
+    final palettes = [
+      {'name': 'Pure White', 'color': Colors.white},
+      {'name': 'Off-White', 'color': const Color(0xFFFAF9F6)},
+      {'name': 'Soft Ivory', 'color': const Color(0xFFFFFDD0)},
+      {'name': 'Marble', 'color': const Color(0xFFF9F6F0)},
+      {'name': 'Soft Peach', 'color': const Color(0xFFFDF2ED)},
+      {'name': 'Rose Quartz', 'color': const Color(0xFFF7EBF0)},
+      {'name': 'Dove Grey', 'color': const Color(0xFFF1F5F9)},
+      {'name': 'Slate Pearl', 'color': const Color(0xFFE2E8F0)},
+      {'name': 'Sage Green', 'color': const Color(0xFFEDF4ED)},
+      {'name': 'Dusty Blue', 'color': const Color(0xFFEBF3F8)},
+      {'name': 'Navy Tint', 'color': const Color(0xFFE2E8F0)},
+      {'name': 'Gold Tint', 'color': const Color(0xFFFBF8EE)},
+    ];
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Item 9: Interactive Custom Color Bar
+        Padding(
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 10, bottom: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Canvas Color:', style: TextStyle(color: _darkBlack, fontSize: 13, fontWeight: FontWeight.w800)),
+              ElevatedButton.icon(
+                onPressed: _showCustomColorPicker,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _limeAccent,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  minimumSize: const Size(0, 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: _darkBlack, width: 1.5),
+                  ),
+                ),
+                icon: const Icon(Icons.colorize_rounded, size: 16),
+                label: const Text('Custom Color +', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 120,
+          child: GridView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              childAspectRatio: 2.3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: palettes.length,
+            itemBuilder: (context, idx) {
+              final p = palettes[idx];
+              final color = p['color'] as Color;
+              final name = p['name'] as String;
+              final isSel = _canvasBgTint == color;
+              return InkWell(
+                onTap: () => setState(() => _canvasBgTint = color),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSel ? _limeAccent : _darkBlack,
+                      width: isSel ? 2.5 : 1.5,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      color: color.computeLuminance() > 0.5 ? Colors.black87 : Colors.white,
+                      fontSize: 10,
+                      fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+    );
+  }
+
+  // DEFAULT MAIN STUDIO DOCK (White + Lime Green Pill Indicator + Item 10 Background tool!)
+  Widget _buildMainStudioDock() {
+    return Container(
+      height: 90, // Slightly taller to accommodate bigger icons
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16), // Padding for scroll edges
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          _buildDockItem(
+            icon: Icons.dashboard_outlined,
+            label: 'Templates',
+            isActive: _activeTray == ActiveTrayType.templates,
+            onTap: () => _toggleTray(ActiveTrayType.templates),
+          ),
+          _buildDockItem(
+            icon: Icons.menu_book_rounded,
+            label: 'Verses',
+            isActive: _activeTray == ActiveTrayType.verses,
+            onTap: () => _toggleTray(ActiveTrayType.verses),
+          ),
+          _buildDockItem(
+            icon: Icons.local_florist_rounded,
+            label: 'Flowers',
+            isActive: _activeTray == ActiveTrayType.flowers,
+            onTap: () => _toggleTray(ActiveTrayType.flowers),
+          ),
+          _buildDockItem(
+            icon: Icons.title_rounded,
+            label: 'Text',
+            isActive: _activeTray == ActiveTrayType.text,
+            onTap: () => _toggleTray(ActiveTrayType.text),
+          ),
+          _buildDockItem(
+            icon: Icons.crop_square_rounded,
+            label: 'Frame',
+            isActive: _activeTray == ActiveTrayType.frame,
+            onTap: () => _toggleTray(ActiveTrayType.frame),
+          ),
+          _buildDockItem(
+            icon: Icons.photo_library_outlined,
+            label: 'Photo',
+            isActive: _activeTray == ActiveTrayType.photo,
+            onTap: () => _toggleTray(ActiveTrayType.photo),
+          ),
+          _buildDockItem(
+            icon: Icons.wallpaper_rounded,
+            label: 'Background',
+            isActive: _activeTray == ActiveTrayType.background,
+            onTap: () => _toggleTray(ActiveTrayType.background),
+          ),
+          _buildDockItem(
+            icon: Icons.palette_outlined,
+            label: 'Theme',
+            isActive: _activeTray == ActiveTrayType.theme,
+            onTap: () => _toggleTray(ActiveTrayType.theme),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildDockItem({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // increased padding for spacing
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: isActive ? 16 : 4, vertical: isActive ? 6 : 2),
+              decoration: isActive
+                  ? BoxDecoration(
+                      color: _limeAccent, // Vibrant Lime Green Pill from screenshot!
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _darkBlack, width: 1.5),
+                    )
+                  : null,
+              child: Icon(
+                icon,
+                color: isActive ? Colors.black : const Color(0xFF475569),
+                size: 26, // Increased icon size
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.black : const Color(0xFF475569),
+                fontSize: 11, // Increased text size
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _changeTextSize(double delta) {
+    setState(() {
+      if (_textStyles.containsKey(_selectedType)) {
+        final style = _textStyles[_selectedType]!;
+        style.size = (style.size + delta).clamp(10.0, 64.0);
+      }
+    });
+  }
+
+  void _showPositionSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Position', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _buildActionChip(Icons.vertical_align_top, 'Top', () => _alignSelected('top')),
+                _buildActionChip(Icons.vertical_align_center, 'Center', () => _alignSelected('center')),
+                _buildActionChip(Icons.vertical_align_bottom, 'Bottom', () => _alignSelected('bottom')),
+                _buildActionChip(Icons.align_horizontal_left, 'Left', () => _alignSelected('left')),
+                _buildActionChip(Icons.align_horizontal_right, 'Right', () => _alignSelected('right')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text('Arrange', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: ElevatedButton(onPressed: () => _moveZIndex(1), child: const Text('Forward'))),
+                const SizedBox(width: 12),
+                Expanded(child: ElevatedButton(onPressed: () => _moveZIndex(-1), child: const Text('Backward'))),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNudgeSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Nudge', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            IconButton(icon: const Icon(Icons.arrow_upward), onPressed: () => _nudgeSelected(0, -1)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => _nudgeSelected(-1, 0)),
+                const SizedBox(width: 48),
+                IconButton(icon: const Icon(Icons.arrow_forward), onPressed: () => _nudgeSelected(1, 0)),
+              ],
+            ),
+            IconButton(icon: const Icon(Icons.arrow_downward), onPressed: () => _nudgeSelected(0, 1)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showOpacitySheet() {
+    // We need state inside the bottom sheet to update the slider
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          double currentOpacity = 1.0;
+          if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+            currentOpacity = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId).opacity;
+          } else if (_activeTextLayer != null) {
+            currentOpacity = _activeTextLayer!.opacity;
+          }
+          return Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Transparency', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('${(currentOpacity * 100).toInt()}%'),
+                  ],
+                ),
+                Slider(
+                  value: currentOpacity,
+                  min: 0.0,
+                  max: 1.0,
+                  onChanged: (val) {
+                    setSheetState(() => currentOpacity = val);
+                    setState(() {
+                      if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+                        _overlayItems.firstWhere((i) => i.id == _selectedOverlayId).opacity = val;
+                      } else if (_activeTextLayer != null) {
+                        _activeTextLayer!.opacity = val;
+                      }
+                    });
+                  },
+                  onChangeEnd: (_) => _saveState(),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildActionChip(IconData icon, String label, VoidCallback onTap) {
+    return ActionChip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label),
+      onPressed: onTap,
+    );
+  }
+
+  void _alignSelected(String position) {
+    setState(() {
+      final w = widget.template.width;
+      final h = widget.template.height;
+
+      void alignItem(dynamic item, double itemW, double itemH, bool isAbsolute) {
+        if (isAbsolute) {
+           if (position == 'left') item.position = Offset(0, item.position.dy);
+           if (position == 'right') item.position = Offset(w - itemW, item.position.dy);
+           if (position == 'center') item.position = Offset((w - itemW) / 2, item.position.dy);
+           if (position == 'top') item.position = Offset(item.position.dx, 0);
+           if (position == 'bottom') item.position = Offset(item.position.dx, h - itemH);
+        } else {
+           if (position == 'left') item.x = 0.0;
+           if (position == 'right') item.x = 1.0 - (itemW / w);
+           if (position == 'center') item.x = 0.5 - ((itemW / w) / 2);
+           if (position == 'top') item.y = 0.0;
+           if (position == 'bottom') item.y = 1.0 - (itemH / h);
+        }
+      }
+
+      if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+        final item = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
+        if (!item.locked) alignItem(item, w * 0.9 * item.scale, h * 0.9 * item.scale, true);
+      } else if (_selectedType == SelectedElementType.templateImage && _selectedOverlayId != null) {
+        final layer = widget.template.imageLayers.firstWhere((i) => i.id == _selectedOverlayId);
+        if (!layer.locked) alignItem(layer, layer.width * w, layer.height * h, false);
+      } else if (_activeTextLayer != null) {
+        if (!_activeTextLayer!.locked) alignItem(_activeTextLayer!, _activeTextLayer!.width * w, _activeTextLayer!.height * h, false);
+      }
+    });
+    _saveState();
+    Navigator.pop(context);
+  }
+
+  void _moveZIndex(int delta) {
+    setState(() {
+      final all = _getAllLayersMetadata();
+      all.sort((a, b) => (a['zIndex'] as int).compareTo(b['zIndex'] as int));
+
+      int selectedIdx = -1;
+      for (int i = 0; i < all.length; i++) {
+        if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+          if (all[i]['id'] == _selectedOverlayId) selectedIdx = i;
+        } else if (_selectedType == SelectedElementType.photo && _selectedOverlayId != null) {
+          if (all[i]['id'] == _selectedOverlayId) selectedIdx = i;
+        } else if (_selectedType == SelectedElementType.shape && _selectedOverlayId != null) {
+          if (all[i]['id'] == _selectedOverlayId) selectedIdx = i;
+        } else if (_selectedType == SelectedElementType.templateImage && _selectedOverlayId != null) {
+          if (all[i]['id'] == _selectedOverlayId) selectedIdx = i;
+        } else if (_activeTextLayer != null) {
+          if (all[i]['id'] == _activeTextLayer!.id) selectedIdx = i;
+        }
+      }
+
+      if (selectedIdx != -1) {
+        int targetIdx = selectedIdx + delta;
+        if (targetIdx >= 0 && targetIdx < all.length) {
+          final item = all.removeAt(selectedIdx);
+          all.insert(targetIdx, item);
+
+          for (int i = 0; i < all.length; i++) {
+            final obj = all[i]['obj'];
+            final newZ = i + 1;
+            if (obj is TextLayer) obj.zIndex = newZ;
+            else if (obj is ImageLayer) obj.zIndex = newZ;
+            else if (obj is ShapeLayer) obj.zIndex = newZ;
+            else if (obj is CanvasOverlayItem) obj.zIndex = newZ;
+          }
+          _saveState();
+        }
+      }
+    });
+  }
+  void _nudgeSelected(double dx, double dy) {
+    setState(() {
+      final double speed = 35.0; // Increased speed for noticeable movement
+      final moveX = dx * speed;
+      final moveY = dy * speed;
+
+      if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+        final item = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
+        if (!item.locked) item.position = Offset(item.position.dx + moveX, item.position.dy + moveY);
+      } else if ((_selectedType == SelectedElementType.templateImage || _selectedType == SelectedElementType.shape) && _selectedOverlayId != null) {
+        // Try image layers
+        try {
+          final layer = widget.template.imageLayers.firstWhere((i) => i.id == _selectedOverlayId);
+          if (!layer.locked) {
+            layer.x += (moveX / widget.template.width);
+            layer.y += (moveY / widget.template.height);
+          }
+        } catch (e) {
+          // If not in image layers, try shape layers
+          try {
+            final layer = widget.template.shapeLayers.firstWhere((i) => i.id == _selectedOverlayId);
+            if (!layer.locked) {
+              layer.x += (moveX / widget.template.width);
+              layer.y += (moveY / widget.template.height);
+            }
+          } catch (e) {}
+        }
+      } else if (_activeTextLayer != null) {
+        if (!_activeTextLayer!.locked) {
+          _activeTextLayer!.x += (moveX / widget.template.width);
+          _activeTextLayer!.y += (moveY / widget.template.height);
+        }
+      }
+    });
+    _saveState();
+  }
+
+  void _showFlipSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Flip', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildActionChip(Icons.flip_rounded, 'Flip Horizontal', () {
+                  setState(() {
+                    if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+                      final item = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
+                      item.flipHorizontal = !item.flipHorizontal;
+                    } else if (_activeTextLayer != null) {
+                      _activeTextLayer!.flipHorizontal = !_activeTextLayer!.flipHorizontal;
+                    }
+                    _saveState();
+                  });
+                  Navigator.pop(context);
+                }),
+                _buildActionChip(Icons.flip_rounded, 'Flip Vertical', () {
+                  // Actually should be a vertically flipped icon, but flip_rounded is standard
+                  setState(() {
+                    if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+                      final item = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
+                      item.flipVertical = !item.flipVertical;
+                    } else if (_activeTextLayer != null) {
+                      _activeTextLayer!.flipVertical = !_activeTextLayer!.flipVertical;
+                    }
+                    _saveState();
+                  });
+                  Navigator.pop(context);
+                }),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cropSelectedImage() async {
+    if (_selectedType != SelectedElementType.photo && _selectedType != SelectedElementType.overlay) return;
+    
+    String? sourceUrl;
+    if (_selectedType == SelectedElementType.photo) {
+      final layer = widget.template.imageLayers.firstWhere((i) => i.type == 'frame');
+      sourceUrl = layer.url;
+    } else if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+      final item = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
+      if (item.graphic.isImageOverlay) {
+        sourceUrl = '${ApiService.baseUrl}/flowers/${item.graphic.imageFile}';
+      }
+    }
+    
+    if (sourceUrl == null) return;
+    
+    // In a real app we'd download the image, save to temp, then crop. 
+    // Since this is network image, we might need to fetch it first.
+    // For now, this is a stub as per implementation plan to show UI.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Cropping requires downloading network images first (Stub).')),
+    );
+  }
+
+  Widget _buildSecondaryToolbar() {
+    return Container(
+      height: 60,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        children: [
+          _buildSecondaryToolbarButton(
+            icon: Icons.layers_outlined,
+            label: 'Layers',
+            onTap: () {
+              setState(() {
+                _isLayersPanelOpen = true;
+              });
+            },
+          ),
+          _buildSecondaryToolbarButton(
+            icon: Icons.compress_rounded,
+            label: 'Position',
+            onTap: _showPositionSheet,
+          ),
+          _buildSecondaryToolbarButton(
+            icon: Icons.open_with_rounded,
+            label: 'Nudge',
+            onTap: _showNudgeSheet,
+          ),
+          _buildSecondaryToolbarButton(
+            icon: Icons.opacity_rounded,
+            label: 'Transparency',
+            onTap: _showOpacitySheet,
+          ),
+          _buildSecondaryToolbarButton(
+            icon: Icons.crop_rotate_rounded,
+            label: 'Crop',
+            onTap: _cropSelectedImage,
+          ),
+          _buildSecondaryToolbarButton(
+            icon: Icons.flip_rounded,
+            label: 'Flip',
+            onTap: _showFlipSheet,
+          ),
+          _buildSecondaryToolbarButton(
+            icon: Icons.copy_rounded,
+            label: 'Duplicate',
+            onTap: _duplicateSelected,
+          ),
+          _buildSecondaryToolbarButton(
+            icon: Icons.group_work_outlined,
+            label: 'Group',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Long-press items to multi-select, then tap Group (Coming soon)')),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _duplicateSelected() {
+    setState(() {
+      if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+        final item = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
+        final newItem = item.clone();
+        newItem.id = 'item_${DateTime.now().millisecondsSinceEpoch}';
+        newItem.position = Offset(item.position.dx + 20, item.position.dy + 20);
+        _overlayItems.add(newItem);
+        _selectedOverlayId = newItem.id;
+      } else if (_selectedType == SelectedElementType.templateImage && _selectedOverlayId != null) {
+        final layer = widget.template.imageLayers.firstWhere((i) => i.id == _selectedOverlayId);
+        final newLayer = layer.copyWith(
+          x: layer.x + 0.02,
+          y: layer.y + 0.02,
+        );
+        newLayer.id = 'img_${DateTime.now().millisecondsSinceEpoch}';
+        widget.template.imageLayers.add(newLayer);
+        _selectedOverlayId = newLayer.id;
+      } else if (_activeTextLayer != null) {
+        final newTextLayer = _activeTextLayer!.copyWith(
+          x: _activeTextLayer!.x + 0.02,
+          y: _activeTextLayer!.y + 0.02,
+        );
+        newTextLayer.id = 'txt_${DateTime.now().millisecondsSinceEpoch}';
+        widget.template.textLayers.add(newTextLayer);
+        _selectedType = SelectedElementType.overlay; // We don't have a generic text selection type, wait!
+        // Actually for text layers, _selectedType is header/name/dates/tribute. If it's cloned, it loses its special type.
+        // It becomes a generic text layer. For now just clone it.
+      }
+    });
+    _saveState();
+  }
+
+  Widget _buildSecondaryToolbarButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: const Color(0xFF1E293B)),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _getAllLayersMetadata() {
+    final all = <Map<String, dynamic>>[];
+    for (int i = 0; i < widget.template.textLayers.length; i++) {
+      final layer = widget.template.textLayers[i];
+      final title = i == 0 ? 'Header' : i == 1 ? 'Name' : i == 2 ? 'Dates' : 'Tribute';
+      all.add({
+        'id': layer.id,
+        'zIndex': layer.zIndex,
+        'type': 'text',
+        'title': 'Text: $title',
+        'icon': Icons.text_fields_rounded,
+        'obj': layer,
+      });
+    }
+    for (var layer in widget.template.imageLayers) {
+      all.add({
+        'id': layer.id,
+        'zIndex': layer.zIndex,
+        'type': 'image',
+        'title': layer.type == 'frame' ? 'Custom Photo' : 'Image Overlay',
+        'icon': Icons.image_rounded,
+        'obj': layer,
+      });
+    }
+    for (var layer in widget.template.shapeLayers) {
+      all.add({
+        'id': layer.id,
+        'zIndex': layer.zIndex,
+        'type': 'shape',
+        'title': 'Shape',
+        'icon': Icons.category_rounded,
+        'obj': layer,
+      });
+    }
+    for (var layer in _overlayItems) {
+      all.add({
+        'id': layer.id,
+        'zIndex': layer.zIndex,
+        'type': 'flower',
+        'title': layer.graphic.name,
+        'icon': Icons.local_florist_rounded,
+        'obj': layer,
+      });
+    }
+    all.sort((a, b) => (b['zIndex'] as int).compareTo(a['zIndex'] as int)); // Highest zIndex at top
+    return all;
+  }
+
+  Widget _buildLayersPanel() {
+    final allLayers = _getAllLayersMetadata();
+    
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
+        border: Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Layers',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  onPressed: () {
+                    setState(() {
+                      _isLayersPanelOpen = false;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Draggable List
+          Expanded(
+            child: ReorderableListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              onReorder: (oldIndex, newIndex) {
+                if (oldIndex < newIndex) {
+                  newIndex -= 1;
+                }
+                final item = allLayers.removeAt(oldIndex);
+                allLayers.insert(newIndex, item);
+                
+                // Re-assign z-indexes based on new list order (reversed since highest zIndex is at top)
+                setState(() {
+                  for (int i = 0; i < allLayers.length; i++) {
+                    final newZ = allLayers.length - i;
+                    final obj = allLayers[i]['obj'];
+                    if (obj is TextLayer) obj.zIndex = newZ;
+                    else if (obj is ImageLayer) obj.zIndex = newZ;
+                    else if (obj is ShapeLayer) obj.zIndex = newZ;
+                    else if (obj is CanvasOverlayItem) obj.zIndex = newZ;
+                  }
+                  _saveState();
+                });
+              },
+              children: allLayers.map((layer) {
+                final obj = layer['obj'];
+                bool isHidden = false;
+                bool isLocked = false;
+                if (obj is TextLayer) { isHidden = obj.hidden; isLocked = obj.locked; }
+                else if (obj is ImageLayer) { isHidden = obj.hidden; isLocked = obj.locked; }
+                else if (obj is ShapeLayer) { isHidden = obj.hidden; isLocked = obj.locked; }
+                else if (obj is CanvasOverlayItem) { isHidden = obj.hidden; isLocked = obj.locked; }
+                bool isSelected = false;
+                if (obj is TextLayer && _activeTextLayer?.id == obj.id) isSelected = true;
+                if (obj is ImageLayer && _selectedOverlayId == obj.id) isSelected = true;
+                if (obj is ShapeLayer && _selectedOverlayId == obj.id) isSelected = true;
+                if (obj is CanvasOverlayItem && _selectedOverlayId == obj.id) isSelected = true;
+
+                return ListTile(
+                  key: ValueKey(layer['id']),
+                  selected: isSelected,
+                  selectedTileColor: _limeAccent.withOpacity(0.12),
+                  onTap: () {
+                    setState(() {
+                      if (obj is TextLayer) {
+                        _activeTextLayer = obj;
+                        _selectedOverlayId = null;
+                        final layerIndex = widget.template.textLayers.indexOf(obj);
+                        _selectedType = layerIndex == 0 ? SelectedElementType.header : layerIndex == 1 ? SelectedElementType.name : layerIndex == 2 ? SelectedElementType.dates : SelectedElementType.tribute;
+                        _openIntegratedTextTrayFor(_selectedType);
+                      } else if (obj is ImageLayer) {
+                        _selectedOverlayId = obj.id;
+                        _selectedType = obj.type == 'frame' ? SelectedElementType.photo : SelectedElementType.templateImage;
+                        _activeTray = obj.type == 'frame' ? ActiveTrayType.photo : ActiveTrayType.none;
+                      } else if (obj is ShapeLayer) {
+                        _selectedOverlayId = obj.id;
+                        _selectedType = SelectedElementType.shape;
+                        _activeTray = ActiveTrayType.none;
+                      } else if (obj is CanvasOverlayItem) {
+                        _selectedOverlayId = obj.id;
+                        _selectedType = SelectedElementType.overlay;
+                        if (!obj.graphic.isImageOverlay) _activeTray = ActiveTrayType.colors;
+                      }
+                      // Close layers panel when an item is selected
+                      // _isLayersPanelOpen = false; // optional, users might want it to stay open
+                    });
+                  },
+                  leading: Icon(layer['icon'] as IconData, color: isSelected ? _limeAccent : const Color(0xFF64748B)),
+                  title: Text(layer['title'] as String, style: TextStyle(fontSize: 14, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(isHidden ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            if (obj is TextLayer) obj.hidden = !obj.hidden;
+                            else if (obj is ImageLayer) obj.hidden = !obj.hidden;
+                            else if (obj is ShapeLayer) obj.hidden = !obj.hidden;
+                            else if (obj is CanvasOverlayItem) obj.hidden = !obj.hidden;
+                          });
+                          _saveState();
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(isLocked ? Icons.lock_rounded : Icons.lock_open_rounded, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            if (obj is TextLayer) obj.locked = !obj.locked;
+                            else if (obj is ImageLayer) obj.locked = !obj.locked;
+                            else if (obj is ShapeLayer) obj.locked = !obj.locked;
+                            else if (obj is CanvasOverlayItem) obj.locked = !obj.locked;
+                          });
+                          _saveState();
+                        },
+                      ),
+                      const Icon(Icons.drag_handle_rounded, color: Colors.grey),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// UNDO/REDO STATE SNAPSHOT
+class EditorStateSnapshot {
+  final Map<String, dynamic> templateJson;
+  final List<CanvasOverlayItem> overlayItems;
+  final int frameShapeIndex;
+  final String? customFrameImagePath;
+  final String? localBackgroundPath;
+  final String? localPhotoPath;
+
+  EditorStateSnapshot({
+    required this.templateJson,
+    required this.overlayItems,
+    required this.frameShapeIndex,
+    this.customFrameImagePath,
+    this.localBackgroundPath,
+    this.localPhotoPath,
+  });
 }

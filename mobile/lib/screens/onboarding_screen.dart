@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/theme.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -34,9 +35,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.darkBackground,
       body: SafeArea(
         child: Column(
           children: [
+            // Top Bar with Skip button
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0, right: 20.0, left: 20.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white.withOpacity(0.7),
+                    ),
+                    child: const Text(
+                      'Skip',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -56,14 +86,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Container(
                           width: 140,
                           height: 140,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.sunlitCream,
+                          decoration: BoxDecoration(
+                            color: AppTheme.darkSurface,
                             shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.accentNeon.withOpacity(0.15),
+                                blurRadius: 40,
+                                spreadRadius: 10,
+                              ),
+                            ],
                           ),
                           child: Icon(
                             slide.icon,
                             size: 72,
-                            color: AppTheme.terracotta,
+                            color: AppTheme.accentNeon,
                           ),
                         ),
                         const SizedBox(height: 48),
@@ -71,9 +108,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           slide.title,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontFamily: 'serif',
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.walnutBrown,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -81,7 +118,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           slide.description,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: Colors.white.withOpacity(0.6),
                             height: 1.5,
                           ),
                         ),
@@ -92,54 +129,81 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 32.0),
+              child: Column(
                 children: [
+                  // Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (_currentPage < _slides.length - 1) {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeIn,
+                          );
+                        } else {
+                          // Trigger Google Sign-In
+                          final credential = await AuthService.instance.signInWithGoogle();
+                          if (credential != null && context.mounted) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => const HomeScreen()),
+                            );
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Failed to sign in with Google.')),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _currentPage == _slides.length - 1 ? Colors.white : AppTheme.accentNeon,
+                        foregroundColor: AppTheme.textDark,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_currentPage == _slides.length - 1) ...[
+                            // Using a simple icon for Google since we don't have the asset yet
+                            const Icon(Icons.g_mobiledata_rounded, size: 32, color: Colors.blue),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            _currentPage == _slides.length - 1 ? 'Continue with Google' : 'Next',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   // Page Indicators
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
                       _slides.length,
                       (index) => AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.only(right: 8),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                         height: 8,
                         width: _currentPage == index ? 24 : 8,
                         decoration: BoxDecoration(
                           color: _currentPage == index
-                              ? AppTheme.terracotta
-                              : AppTheme.borderSoft,
+                              ? AppTheme.accentNeon
+                              : Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ),
                   ),
-                  // Button
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_currentPage < _slides.length - 1) {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeIn,
-                        );
-                      } else {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                    child: Text(
-                      _currentPage == _slides.length - 1 ? 'Get Started' : 'Next',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
