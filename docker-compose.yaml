@@ -23,6 +23,11 @@ services:
       - NODE_ENV=production
       - PORT=3000
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
 volumes:
   backend-uploads:
