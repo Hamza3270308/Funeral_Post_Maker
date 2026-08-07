@@ -5,8 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "5001:5001"
+    # Ports section removed so Coolify handles the routing via Traefik automatically
     environment:
       - NODE_ENV=production
       - PORT=5001
