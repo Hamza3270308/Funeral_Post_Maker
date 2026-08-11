@@ -10,7 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5001
-      # - MONGO_URI=${MONGO_URI}
+      - MONGO_URI=${MONGO_URI}
     restart: unless-stopped
     volumes:
       - backend-uploads:/app/uploads
