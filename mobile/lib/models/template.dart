@@ -77,8 +77,8 @@ class Template {
 }
 
 class Background {
-  final String type; // 'color' | 'image'
-  final String value;
+  String type; // 'color' | 'image'
+  String value;
 
   Background({required this.type, required this.value});
 

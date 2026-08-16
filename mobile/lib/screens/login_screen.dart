@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import '../services/user_settings_service.dart';
 import '../theme/theme.dart';
 import 'home_screen.dart';
+// Removed onboarding_screen import
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,148 +15,143 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
-  void _handleGoogleSignIn() {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+    final credential = await AuthService.instance.signInWithGoogle();
+    
+    if (!mounted) return;
+    
+    if (credential != null) {
+      // Clear guest status if they log in
+      await UserSettingsService.instance.setGuest(false);
+      _routeAfterLogin();
+    } else {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to sign in with Google.')),
+      );
+    }
+  }
 
-    // Mocking sign-in duration
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
-    });
+  Future<void> _handleGuestSignIn() async {
+    await UserSettingsService.instance.setGuest(true);
+    _routeAfterLogin();
+  }
+
+  void _routeAfterLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
+      backgroundColor: AppTheme.darkBackground,
+      body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Logo Placeholder / Graphic icon
+              const Spacer(flex: 2),
+              // App Logo / Icon with glow
               Container(
-                width: 90,
-                height: 90,
+                width: 120,
+                height: 120,
                 decoration: BoxDecoration(
-                  color: AppTheme.accentNeon.withOpacity(0.1),
                   shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_mosaic_rounded,
-                  size: 44,
-                  color: AppTheme.accentNeon,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Post Maker',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontFamily: 'serif',
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Honoring lives with beautiful tributes',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppTheme.textGray,
-                ),
-              ),
-              const SizedBox(height: 64),
-              
-              // Notification Alert Card explaining Google Login is Required
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.lightSurface.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.borderSoft),
-                ),
-                child: const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      color: AppTheme.accentNeon,
-                      size: 24,
+                  color: AppTheme.darkSurface,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accentNeon.withOpacity(0.3),
+                      blurRadius: 40,
+                      spreadRadius: 10,
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.auto_awesome,
+                    size: 60,
+                    color: AppTheme.accentNeon,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 48),
+              Text(
+                'Welcome',
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Sign in to save and download your beautiful designs, or explore as a guest.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.white.withOpacity(0.6),
+                  height: 1.5,
+                ),
+              ),
+              const Spacer(flex: 3),
+              // Google Sign-In Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _handleGoogleSignIn,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppTheme.textDark,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    elevation: 5,
+                    shadowColor: Colors.black.withOpacity(0.5),
+                  ),
+                  child: _isLoading 
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(color: AppTheme.textDark, strokeWidth: 2),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            'Sign In Required',
+                          const Icon(Icons.g_mobiledata, size: 28),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Continue with Google',
                             style: TextStyle(
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: AppTheme.textDark,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'To save your customized designs and access them securely, Google Sign-In is required.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textGray,
-                              height: 1.4,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
                 ),
               ),
-              const SizedBox(height: 40),
-              
-              // Google Sign-In button
-              _isLoading
-                  ? const CircularProgressIndicator(color: AppTheme.accentNeon)
-                  : SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: _handleGoogleSignIn,
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(color: AppTheme.borderSoft),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.login_rounded,
-                              color: AppTheme.accentNeon,
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Sign In with Google',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+              const SizedBox(height: 16),
+              // Guest Button
+              TextButton(
+                onPressed: _isLoading ? null : _handleGuestSignIn,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white.withOpacity(0.6),
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                ),
+                child: const Text(
+                  'Continue as Guest',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Spacer(flex: 1),
             ],
           ),
         ),

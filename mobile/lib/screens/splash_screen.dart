@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'onboarding_screen.dart';
 import '../theme/theme.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/user_settings_service.dart';
+import 'home_screen.dart';
+import 'login_screen.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -26,19 +31,34 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    // Auto-transition to onboarding screen
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const OnboardingScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 800),
-          ),
-        );
+    // Auto-transition: wait for both the splash delay AND a fresh read of settings from disk
+    Future.wait([
+      Future.delayed(const Duration(seconds: 3)),
+      UserSettingsService.instance.init(),
+    ]).then((_) {
+      if (!mounted) return;
+      final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+      final isGuest = UserSettingsService.instance.isGuest;
+      final hasSeenOnboarding = UserSettingsService.instance.hasSeenOnboarding;
+
+      Widget nextScreen;
+      if (!hasSeenOnboarding) {
+        nextScreen = const OnboardingScreen();
+      } else if (!isLoggedIn && !isGuest) {
+        nextScreen = const LoginScreen();
+      } else {
+        nextScreen = const HomeScreen();
       }
+
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
+      );
     });
   }
 

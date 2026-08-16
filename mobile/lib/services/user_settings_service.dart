@@ -12,12 +12,16 @@ class UserSettingsService extends ChangeNotifier {
   String _exportFormat = 'PNG (High Quality)';
   bool _isDarkMode = false;
   List<String> _favoriteTemplateIds = [];
+  bool _hasSeenOnboarding = false;
+  bool _isGuest = false;
 
   String get name => _name;
   bool get notificationsEnabled => _notificationsEnabled;
   String get exportFormat => _exportFormat;
   bool get isDarkMode => _isDarkMode;
   List<String> get favoriteTemplateIds => _favoriteTemplateIds;
+  bool get hasSeenOnboarding => _hasSeenOnboarding;
+  bool get isGuest => _isGuest;
 
   Future<void> init() async {
     try {
@@ -32,6 +36,8 @@ class UserSettingsService extends ChangeNotifier {
           if (data['favoriteTemplateIds'] != null) {
             _favoriteTemplateIds = List<String>.from(data['favoriteTemplateIds']);
           }
+          _hasSeenOnboarding = data['hasSeenOnboarding'] ?? _hasSeenOnboarding;
+          _isGuest = data['isGuest'] ?? _isGuest;
           notifyListeners();
         }
       }
@@ -54,6 +60,8 @@ class UserSettingsService extends ChangeNotifier {
         'exportFormat': _exportFormat,
         'isDarkMode': _isDarkMode,
         'favoriteTemplateIds': _favoriteTemplateIds,
+        'hasSeenOnboarding': _hasSeenOnboarding,
+        'isGuest': _isGuest,
       };
       await file.writeAsString(json.encode(data));
     } catch (_) {
@@ -91,6 +99,18 @@ class UserSettingsService extends ChangeNotifier {
     } else {
       _favoriteTemplateIds.add(templateId);
     }
+    notifyListeners();
+    await _save();
+  }
+
+  Future<void> setHasSeenOnboarding(bool value) async {
+    _hasSeenOnboarding = value;
+    notifyListeners();
+    await _save();
+  }
+
+  Future<void> setGuest(bool value) async {
+    _isGuest = value;
     notifyListeners();
     await _save();
   }

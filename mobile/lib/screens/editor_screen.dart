@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:image_cropper/image_cropper.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_arc_text/flutter_arc_text.dart';
@@ -8,13 +10,16 @@ import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../models/template.dart';
 import '../models/memorial_element.dart';
 import '../data/memorial_elements_library.dart';
 import '../services/api_service.dart';
 import '../theme/theme.dart';
 import 'export_screen.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
+import '../services/user_settings_service.dart';
 enum SelectedElementType {
   none,
   photo,
@@ -281,6 +286,11 @@ class _EditorScreenState extends State<EditorScreen> {
 
   late Map<SelectedElementType, TextLayerStyle> _textStyles;
   TextLayer? _activeTextLayer;
+  
+  // Gesture scale state variables
+  double _baseScale = 1.0;
+  double _baseWidth = 0.5;
+  double _baseHeight = 0.5;
 
   // Current theme palette background tint (off-white cream default)
   Color _canvasBgTint = const Color(0xFFFAF9F6);
@@ -425,7 +435,7 @@ class _EditorScreenState extends State<EditorScreen> {
         }
 
         if (targetLayer != null) {
-           targetLayer.content = '';
+           widget.template.textLayers.remove(targetLayer);
         }
 
         if (_selectedType == SelectedElementType.header) _startingLine = '';
@@ -436,9 +446,12 @@ class _EditorScreenState extends State<EditorScreen> {
       } else if (_selectedType == SelectedElementType.photo) {
         _localPhotoPath = null;
         _customFrameImagePath = null;
+        widget.template.imageLayers.removeWhere((l) => l.type == 'frame');
+        _frameShapeIndex = 0;
       }
       _selectedType = SelectedElementType.none;
       _selectedOverlayId = null;
+      _activeTextLayer = null;
       _activeTray = ActiveTrayType.none;
     });
     _saveState();
@@ -487,59 +500,88 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   // Item 9: Pick Custom Background Tint Color
+  // Item 9: Pick Custom Background Tint Color with RGB Sliders
   void _showCustomColorPicker() {
-    Color selectedColor = _canvasBgTint;
+    int r = 255;
+    int g = 255;
+    int b = 255;
+    
+    if (widget.template.background.type == 'color') {
+      try {
+        final hex = widget.template.background.value;
+        final col = _parseHexColor(hex);
+        r = col.red;
+        g = col.green;
+        b = col.blue;
+      } catch (_) {}
+    }
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Choose Custom Canvas Color', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: SingleChildScrollView(
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              Colors.white,
-              const Color(0xFFFAF9F6),
-              const Color(0xFFFFFDD0),
-              const Color(0xFFE8F1F5),
-              const Color(0xFFEFE6DD),
-              const Color(0xFFFDEBED),
-              const Color(0xFFEDF7ED),
-              const Color(0xFFFFF5E1),
-              const Color(0xFFE2E8F0),
-              const Color(0xFFCBD5E1),
-              const Color(0xFF475569),
-              const Color(0xFF1E293B),
-              const Color(0xFF0F172A),
-              Colors.black,
-              const Color(0xFFBAFF00), // Lime Green
-              const Color(0xFFD4AF37), // Gold
-            ].map((col) {
-              return GestureDetector(
-                onTap: () {
-                  selectedColor = col;
-                  setState(() => _canvasBgTint = col);
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final currentColor = Color.fromARGB(255, r, g, b);
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Choose Canvas Color', style: TextStyle(fontWeight: FontWeight.w800, color: _darkBlack)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ColorPicker(
+                    pickerColor: currentColor,
+                    onColorChanged: (color) {
+                      setDialogState(() {
+                        r = color.red;
+                        g = color.green;
+                        b = color.blue;
+                      });
+                    },
+                    colorPickerWidth: 300.0,
+                    pickerAreaHeightPercent: 0.7,
+                    enableAlpha: false,
+                    displayThumbColor: true,
+                    showLabel: true,
+                    paletteType: PaletteType.hsvWithHue,
+                    pickerAreaBorderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(2.0),
+                      topRight: Radius.circular(2.0),
+                    ),
+                  ),
+
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    widget.template.background.type = 'color';
+                    widget.template.background.value = '#${r.toRadixString(16).padLeft(2, '0').toUpperCase()}${g.toRadixString(16).padLeft(2, '0').toUpperCase()}${b.toRadixString(16).padLeft(2, '0').toUpperCase()}';
+                    _localBackgroundPath = null;
+                  });
+                  _saveState();
                   Navigator.pop(ctx);
                 },
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: col,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _darkBlack, width: 2),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _limeAccent,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: _darkBlack, width: 1.5),
                   ),
                 ),
-              );
-            }).toList(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
+                child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -552,12 +594,13 @@ class _EditorScreenState extends State<EditorScreen> {
       } else {
         _activeTray = type;
         if (type == ActiveTrayType.text) {
-          _openIntegratedTextTrayFor(
-            _selectedType != SelectedElementType.none &&
-                    _textStyles.containsKey(_selectedType)
-                ? _selectedType
-                : SelectedElementType.tribute,
-          );
+          // If we open the text tray from the dock, assume it's to add new text
+          _activeTextLayer = null;
+          _selectedType = SelectedElementType.none;
+          _messageContent = '';
+          _textEditingController.clear();
+          // Automatically create a new text box for them
+          _updateActiveTextProperty((l) {}, insertIfMissing: true);
         }
       }
     });
@@ -655,6 +698,11 @@ class _EditorScreenState extends State<EditorScreen> {
 
   // Export & Share full canvas at 3x resolution
   Future<void> _exportAndShare() async {
+    if (FirebaseAuth.instance.currentUser == null) {
+      _showGuestLoginDialog();
+      return;
+    }
+
     _deselectAll();
     await Future.delayed(const Duration(milliseconds: 100));
 
@@ -727,6 +775,57 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  void _showGuestLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.darkSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign In Required', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Guests can explore and edit, but downloading designs requires a Google account.',
+          style: TextStyle(color: Colors.white.withOpacity(0.7)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.6))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppTheme.textDark,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() => _isExporting = true);
+              final credential = await AuthService.instance.signInWithGoogle();
+              setState(() => _isExporting = false);
+              
+              if (credential != null) {
+                await UserSettingsService.instance.setGuest(false);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Successfully signed in! You can now download your design.')),
+                  );
+                }
+              }
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.g_mobiledata, size: 24),
+                const SizedBox(width: 4),
+                const Text('Sign In', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Item 5: Content-Adaptive Dynamic Tray Heights (snug fit, no bottom empty space!)
   double _getTrayHeight(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
@@ -796,23 +895,21 @@ class _EditorScreenState extends State<EditorScreen> {
             
             // DYNAMIC LAYERS PANEL OR STANDARD DOCK
             if (_isLayersPanelOpen)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 100.0),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.45,
-                  child: _buildLayersPanel(),
-                ),
+              SizedBox(
+                // Ensure exactly 45% of screen height
+                height: MediaQuery.of(context).size.height * 0.45,
+                child: _buildLayersPanel(),
               )
             else ...[
-              // DYNAMIC CONTENT-ADAPTIVE TRAY
+              // DYNAMIC CONTENT-ADAPTIVE TRAY OR STANDARD DOCK
               if (_activeTray != ActiveTrayType.none) _buildActiveTrayPanel(),
-              // FIX #11: Bottom dock respects system home indicator
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 100.0),
-                  child: _buildMainStudioDock(),
+              Padding(
+                // 96px bottom offset keeps the dock above the home screen's
+                // floating nav bar (70px height + 24px bottom offset = 94px).
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 94,
                 ),
+                child: _buildMainStudioDock(),
               ),
             ],
           ],
@@ -1071,11 +1168,14 @@ class _EditorScreenState extends State<EditorScreen> {
             }
           });
         },
-        onPanUpdate: (details) {
-          _handlePanUpdate(layer, details, w, h);
+        onScaleStart: (details) {
+          _handleScaleStart(layer, details);
         },
-        onPanEnd: (details) {
-          if (!layer.locked) _saveState();
+        onScaleUpdate: (details) {
+          _handleScaleUpdate(layer, details, w, h);
+        },
+        onScaleEnd: (details) {
+          _handleScaleEnd(layer, details);
         },
         child: Container(
           padding: const EdgeInsets.all(4),
@@ -1141,11 +1241,14 @@ class _EditorScreenState extends State<EditorScreen> {
             }
           });
         },
-        onPanUpdate: (details) {
-          _handlePanUpdate(layer, details, w, h);
+        onScaleStart: (details) {
+          _handleScaleStart(layer, details);
         },
-        onPanEnd: (details) {
-          if (!layer.locked) _saveState();
+        onScaleUpdate: (details) {
+          _handleScaleUpdate(layer, details, w, h);
+        },
+        onScaleEnd: (details) {
+          _handleScaleEnd(layer, details);
         },
         child: Container(
           padding: const EdgeInsets.all(4),
@@ -1369,22 +1472,87 @@ class _EditorScreenState extends State<EditorScreen> {
             }
           });
         },
-        onPanUpdate: (details) {
-          _handlePanUpdate(layer, details, w, h);
+        onScaleStart: (details) {
+          _handleScaleStart(layer, details);
         },
-        onPanEnd: (details) {
-          if (!layer.locked) _saveState();
+        onScaleUpdate: (details) {
+          _handleScaleUpdate(layer, details, w, h);
+        },
+        onScaleEnd: (details) {
+          _handleScaleEnd(layer, details);
         },
         // Only apply selection decoration when selected
         child: isSelected
-            ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  border: Border.all(color: _limeAccent, width: 2.5),
-                  borderRadius: BorderRadius.circular(6),
-                  color: _limeAccent.withOpacity(0.18),
-                ),
-                child: innerChild,
+            ? Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: -12,
+                    top: -6,
+                    right: -12,
+                    bottom: -6,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: _limeAccent, width: 2.5),
+                        borderRadius: BorderRadius.circular(6),
+                        color: _limeAccent.withOpacity(0.18),
+                      ),
+                    ),
+                  ),
+                  innerChild,
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.topLeft,
+                    onPanUpdate: (details) {
+                      final dx = details.delta.dx / w;
+                      setState(() {
+                        final oldRight = layer.x + layer.width;
+                        layer.width -= dx;
+                        if (layer.width < 0.1) {
+                          layer.width = 0.1;
+                          layer.x = oldRight - 0.1;
+                        } else {
+                          layer.x += dx;
+                        }
+                      });
+                    },
+                  ),
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.topRight,
+                    onPanUpdate: (details) {
+                      final dx = details.delta.dx / w;
+                      setState(() {
+                        layer.width += dx;
+                        if (layer.width < 0.1) layer.width = 0.1;
+                      });
+                    },
+                  ),
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.bottomLeft,
+                    onPanUpdate: (details) {
+                      final dx = details.delta.dx / w;
+                      setState(() {
+                        final oldRight = layer.x + layer.width;
+                        layer.width -= dx;
+                        if (layer.width < 0.1) {
+                          layer.width = 0.1;
+                          layer.x = oldRight - 0.1;
+                        } else {
+                          layer.x += dx;
+                        }
+                      });
+                    },
+                  ),
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.bottomRight,
+                    onPanUpdate: (details) {
+                      final dx = details.delta.dx / w;
+                      setState(() {
+                        layer.width += dx;
+                        if (layer.width < 0.1) layer.width = 0.1;
+                      });
+                    },
+                  ),
+                ],
               )
             : innerChild,
       ),
@@ -1455,8 +1623,18 @@ class _EditorScreenState extends State<EditorScreen> {
             }
           });
         },
+        onScaleStart: (details) {
+          _handleScaleStart(layer, details);
+        },
+        onScaleUpdate: (details) {
+          _handleScaleUpdate(layer, details, w, h);
+        },
+        onScaleEnd: (details) {
+          _handleScaleEnd(layer, details);
+        },
         child: Stack(
           alignment: Alignment.center,
+          clipBehavior: Clip.none,
           children: [
             Container(
               width: layer.width * w,
@@ -1488,22 +1666,84 @@ class _EditorScreenState extends State<EditorScreen> {
                   ),
                 ),
               ),
-            if (isSelected)
-              Positioned(
-                right: -12,
-                top: -12,
-                child: GestureDetector(
-                  onTap: _deleteSelectedElement,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    padding: const EdgeInsets.all(4),
-                    child: const Icon(Icons.close, color: Colors.white, size: 16),
-                  ),
-                ),
+            if (isSelected) ...[
+              _buildCornerResizeHandle(
+                alignment: Alignment.topLeft,
+                onPanUpdate: (details) {
+                  final dx = details.delta.dx / w;
+                  final dy = details.delta.dy / h;
+                  setState(() {
+                    final oldRight = layer.x + layer.width;
+                    final oldBottom = layer.y + layer.height;
+                    layer.width -= dx;
+                    layer.height -= dy;
+                    if (layer.width < 0.1) {
+                      layer.width = 0.1;
+                      layer.x = oldRight - 0.1;
+                    } else {
+                      layer.x += dx;
+                    }
+                    if (layer.height < 0.1) {
+                      layer.height = 0.1;
+                      layer.y = oldBottom - 0.1;
+                    } else {
+                      layer.y += dy;
+                    }
+                  });
+                },
               ),
+              _buildCornerResizeHandle(
+                alignment: Alignment.topRight,
+                onPanUpdate: (details) {
+                  final dx = details.delta.dx / w;
+                  final dy = details.delta.dy / h;
+                  setState(() {
+                    final oldBottom = layer.y + layer.height;
+                    layer.width += dx;
+                    layer.height -= dy;
+                    if (layer.width < 0.1) layer.width = 0.1;
+                    if (layer.height < 0.1) {
+                      layer.height = 0.1;
+                      layer.y = oldBottom - 0.1;
+                    } else {
+                      layer.y += dy;
+                    }
+                  });
+                },
+              ),
+              _buildCornerResizeHandle(
+                alignment: Alignment.bottomLeft,
+                onPanUpdate: (details) {
+                  final dx = details.delta.dx / w;
+                  final dy = details.delta.dy / h;
+                  setState(() {
+                    final oldRight = layer.x + layer.width;
+                    layer.width -= dx;
+                    layer.height += dy;
+                    if (layer.height < 0.1) layer.height = 0.1;
+                    if (layer.width < 0.1) {
+                      layer.width = 0.1;
+                      layer.x = oldRight - 0.1;
+                    } else {
+                      layer.x += dx;
+                    }
+                  });
+                },
+              ),
+              _buildCornerResizeHandle(
+                alignment: Alignment.bottomRight,
+                onPanUpdate: (details) {
+                  final dx = details.delta.dx / w;
+                  final dy = details.delta.dy / h;
+                  setState(() {
+                    layer.width += dx;
+                    layer.height += dy;
+                    if (layer.width < 0.1) layer.width = 0.1;
+                    if (layer.height < 0.1) layer.height = 0.1;
+                  });
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -1578,13 +1818,12 @@ class _EditorScreenState extends State<EditorScreen> {
 
       Widget overlayChild;
       if (item.graphic.isImageOverlay) {
-        // Real PNG floral image from backend — match web's object-fit:contain + multiply blend
+        // Real PNG floral image from backend
         final imageUrl = '${ApiService.baseUrl}/flowers/${item.graphic.imageFile}';
         final imgW = w * 0.9 * item.scale;
-        final imgH = h * 0.9 * item.scale;
         overlayChild = SizedBox(
           width: imgW,
-          height: imgH,
+          // Removed height: imgH to allow the bounding box to shrink-wrap the image aspect ratio
           child: Opacity(
             opacity: item.opacity,
             child: Transform.scale(
@@ -1593,7 +1832,6 @@ class _EditorScreenState extends State<EditorScreen> {
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.contain,
-                // Apply multiply blend mode to match web dashboard's mix-blend-mode: multiply
                 color: Colors.black.withOpacity(0.0), // transparent tint
                 colorBlendMode: BlendMode.multiply,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -1629,61 +1867,138 @@ class _EditorScreenState extends State<EditorScreen> {
               }
             });
           },
-          onPanUpdate: (details) {
-            _handlePanUpdate(item, details, w, h);
-          },
-          onPanEnd: (details) {
-            if (!item.locked) _saveState();
-          },
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: isSelected
-                ? BoxDecoration(
-                    border: Border.all(color: _limeAccent, width: 2.5),
-                    borderRadius: BorderRadius.circular(8),
-                    color: _limeAccent.withOpacity(0.12),
-                  )
-                : null,
-            child: overlayChild,
-          ),
+        onScaleStart: (details) {
+          _handleScaleStart(item, details);
+        },
+        onScaleUpdate: (details) {
+          _handleScaleUpdate(item, details, w, h);
+        },
+        onScaleEnd: (details) {
+          _handleScaleEnd(item, details);
+        },
+        child: isSelected 
+            ? Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: _limeAccent, width: 2.5),
+                      borderRadius: BorderRadius.circular(8),
+                      color: _limeAccent.withOpacity(0.12),
+                    ),
+                    child: overlayChild,
+                  ),
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.topLeft,
+                    onPanUpdate: (details) {
+                      setState(() {
+                        item.scale -= details.delta.dx / w;
+                        if (item.scale < 0.1) item.scale = 0.1;
+                      });
+                    },
+                  ),
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.topRight,
+                    onPanUpdate: (details) {
+                      setState(() {
+                        item.scale += details.delta.dx / w;
+                        if (item.scale < 0.1) item.scale = 0.1;
+                      });
+                    },
+                  ),
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.bottomLeft,
+                    onPanUpdate: (details) {
+                      setState(() {
+                        item.scale -= details.delta.dx / w;
+                        if (item.scale < 0.1) item.scale = 0.1;
+                      });
+                    },
+                  ),
+                  _buildCornerResizeHandle(
+                    alignment: Alignment.bottomRight,
+                    onPanUpdate: (details) {
+                      setState(() {
+                        item.scale += details.delta.dx / w;
+                        if (item.scale < 0.1) item.scale = 0.1;
+                      });
+                    },
+                  ),
+                ],
+              )
+              : Container(
+                  padding: const EdgeInsets.all(4),
+                  child: overlayChild,
+                ),
         ),
       );
     }
 
-  void _handlePanUpdate(dynamic layer, DragUpdateDetails details, double w, double h) {
-    if (layer.locked) return;
-    
-    final dx = details.delta.dx / w;
-    final dy = details.delta.dy / h;
-    final absDx = details.delta.dx;
-    final absDy = details.delta.dy;
+  void _handleScaleStart(dynamic layer, ScaleStartDetails details) {
+    if (layer is CanvasOverlayItem) {
+      _baseScale = layer.scale;
+    } else if (layer is TextLayer) {
+      _baseWidth = layer.width;
+    } else if (layer is ImageLayer) {
+      _baseWidth = layer.width;
+      _baseHeight = layer.height;
+    }
+  }
 
-    setState(() {
-      final groupId = layer.groupId;
-      if (groupId != null && groupId.isNotEmpty) {
-        // Move all items in this group
-        for (var l in widget.template.imageLayers) {
-          if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
-        }
-        for (var l in widget.template.shapeLayers) {
-          if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
-        }
-        for (var l in widget.template.textLayers) {
-          if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
-        }
-        for (var l in _overlayItems) {
-          if (l.groupId == groupId && !l.locked) { l.position = Offset(l.position.dx + absDx, l.position.dy + absDy); }
-        }
-      } else {
-        // Move only this item
+  void _handleScaleUpdate(dynamic layer, ScaleUpdateDetails details, double w, double h) {
+    if (layer.locked) return;
+
+    if (details.pointerCount == 2) {
+      // Two-finger pinch to scale
+      setState(() {
         if (layer is CanvasOverlayItem) {
-          layer.position = Offset(layer.position.dx + absDx, layer.position.dy + absDy);
-        } else {
-          layer.x += dx;
-          layer.y += dy;
+          layer.scale = (_baseScale * details.scale).clamp(0.1, 5.0);
+        } else if (layer is TextLayer) {
+          layer.width = (_baseWidth * details.scale).clamp(0.1, 1.0);
+        } else if (layer is ImageLayer) {
+          layer.width = (_baseWidth * details.scale).clamp(0.1, 1.0);
+          layer.height = (_baseHeight * details.scale).clamp(0.1, 1.0);
         }
-      }
-    });
+      });
+    } else if (details.pointerCount == 1) {
+      // One-finger drag to pan
+      final dx = details.focalPointDelta.dx / w;
+      final dy = details.focalPointDelta.dy / h;
+      final absDx = details.focalPointDelta.dx;
+      final absDy = details.focalPointDelta.dy;
+
+      setState(() {
+        final groupId = layer.groupId;
+        if (groupId != null && groupId.isNotEmpty) {
+          // Move all items in this group
+          for (var l in widget.template.imageLayers) {
+            if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
+          }
+          for (var l in widget.template.shapeLayers) {
+            if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
+          }
+          for (var l in widget.template.textLayers) {
+            if (l.groupId == groupId && !l.locked) { l.x += dx; l.y += dy; }
+          }
+          for (var l in _overlayItems) {
+            if (l.groupId == groupId && !l.locked) { l.position = Offset(l.position.dx + absDx, l.position.dy + absDy); }
+          }
+        } else {
+          // Move only this item
+          if (layer is CanvasOverlayItem) {
+            layer.position = Offset(layer.position.dx + absDx, layer.position.dy + absDy);
+          } else {
+            layer.x += dx;
+            layer.y += dy;
+          }
+        }
+      });
+    }
+  }
+
+  void _handleScaleEnd(dynamic layer, ScaleEndDetails details) {
+    if (!layer.locked) _saveState();
   }
 
   // DYNAMIC HEIGHT INTEGRATED TRAY (White + Lime Green Theme)
@@ -1856,20 +2171,36 @@ class _EditorScreenState extends State<EditorScreen> {
               overflow: TextOverflow.ellipsis,
             ),
             // Item 2: Solid dark black tick inside a vibrant lime green circle badge when selected!
-            trailing: isSelected
-                ? Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: _limeAccent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _darkBlack, width: 1.5),
-                    ),
-                    child: const Icon(Icons.check_rounded, color: Colors.black, size: 16),
-                  )
-                : const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF94A3B8), size: 20),
+            trailing: IconButton(
+              icon: isSelected
+                  ? Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _limeAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _darkBlack, width: 1.5),
+                      ),
+                      child: const Icon(Icons.check_rounded, color: Colors.black, size: 16),
+                    )
+                  : const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF94A3B8), size: 20),
+              onPressed: () {
+                setState(() {
+                  _messageContent = verse.text;
+                  // Fix #4: Always add as a NEW text layer instead of overwriting the currently selected one
+                  _activeTextLayer = null;
+                  _selectedType = SelectedElementType.none;
+                });
+                _updateActiveTextProperty((layer) => layer.content = verse.text, insertIfMissing: true);
+                // Fix: ensure the text tray is completely closed so it doesn't confusingly switch trays
+                setState(() {
+                  _activeTray = ActiveTrayType.none;
+                });
+              },
+            ),
             onTap: () {
-              setState(() => _messageContent = verse.text);
-              _updateActiveTextProperty((layer) => layer.content = verse.text);
+              setState(() {
+                _messageContent = verse.text;
+              });
             },
           ),
         );
@@ -1969,7 +2300,7 @@ class _EditorScreenState extends State<EditorScreen> {
     });
   }
 
-  void _updateActiveTextProperty(void Function(TextLayer) update, {bool saveState = true}) {
+  void _updateActiveTextProperty(void Function(TextLayer) update, {bool saveState = true, bool insertIfMissing = false}) {
     TextLayer? targetLayer = _activeTextLayer;
     if (targetLayer == null) {
       if (_selectedType == SelectedElementType.header && widget.template.textLayers.isNotEmpty) targetLayer = widget.template.textLayers[0];
@@ -1986,13 +2317,45 @@ class _EditorScreenState extends State<EditorScreen> {
         _saveState();
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a text element on the canvas first.', style: TextStyle(fontWeight: FontWeight.w600)),
-          backgroundColor: Colors.black87,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (insertIfMissing) {
+        // Automatically insert a new text layer if none exists!
+        setState(() {
+          final newLayer = TextLayer(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            content: '',
+            x: 0.1,
+            y: 0.45,
+            width: 0.8,
+            height: 0.1,
+            fontFamily: 'Inter',
+            fontSize: 50 / widget.template.width,
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            textDecoration: 'none',
+            opacity: 1.0,
+            color: '#000000',
+            alignment: 'center',
+          );
+          update(newLayer);
+          widget.template.textLayers.add(newLayer);
+          _activeTextLayer = newLayer;
+          _selectedType = SelectedElementType.tribute;
+          if (_textStyles.containsKey(_selectedType)) {
+            _textStyles[_selectedType]!.size = 50.0;
+          }
+          _textEditingController.text = newLayer.content;
+        });
+        if (saveState) _saveState();
+      } else if (saveState) {
+        // Only show snackbar for distinct actions, never for continuous slider drags!
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a text element on the canvas first.', style: TextStyle(fontWeight: FontWeight.w600)),
+            backgroundColor: Colors.black87,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -2009,17 +2372,46 @@ class _EditorScreenState extends State<EditorScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Section 0: Add New Text Button
+          // Section 0: Add New Text Button (Always Visible)
+          Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _activeTextLayer = null;
+                    _selectedType = SelectedElementType.none;
+                    _messageContent = '';
+                    _textEditingController.clear();
+                  });
+                  _updateActiveTextProperty((l) {}, insertIfMissing: true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _limeAccent,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  minimumSize: const Size(double.infinity, 36),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: const BorderSide(color: _darkBlack, width: 1.5),
+                  ),
+                ),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add New Text Box', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+              ),
+            ),
+
           // Section 1: Prominent multi-line text input field
           TextField(
             controller: _textEditingController,
             style: const TextStyle(color: _darkBlack, fontSize: 14, fontWeight: FontWeight.w700),
-            maxLines: 2,
+            maxLines: 1,
             decoration: InputDecoration(
               hintText: 'Type your text here...',
               hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
               filled: true,
               fillColor: const Color(0xFFF1F5F9),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: _darkBlack, width: 1.5),
@@ -2040,7 +2432,7 @@ class _EditorScreenState extends State<EditorScreen> {
               _updateSelectedTextContent(val);
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
 
           // Section 2: Quick Font Name Button & Quick Color Swatch Button
           Row(
@@ -2053,7 +2445,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     backgroundColor: const Color(0xFFF1F5F9),
                     foregroundColor: _darkBlack,
                     elevation: 0,
-                    minimumSize: const Size(0, 44),
+                    minimumSize: const Size(0, 36),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                       side: const BorderSide(color: _darkBlack, width: 1.5),
@@ -2067,7 +2459,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => setState(() => _activeTray = ActiveTrayType.colors),
@@ -2075,15 +2467,15 @@ class _EditorScreenState extends State<EditorScreen> {
                     backgroundColor: const Color(0xFFF1F5F9),
                     foregroundColor: _darkBlack,
                     elevation: 0,
-                    minimumSize: const Size(0, 44),
+                    minimumSize: const Size(0, 36),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                       side: const BorderSide(color: _darkBlack, width: 1.5),
                     ),
                   ),
                   icon: Container(
-                    width: 16,
-                    height: 16,
+                    width: 14,
+                    height: 14,
                     decoration: BoxDecoration(
                       color: style.color,
                       shape: BoxShape.circle,
@@ -2095,7 +2487,7 @@ class _EditorScreenState extends State<EditorScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
 
           // Section 3: Font Size Control with smooth Slider and - / + steps
           Row(
@@ -2108,9 +2500,9 @@ class _EditorScreenState extends State<EditorScreen> {
               ),
               Expanded(
                 child: Slider(
-                  value: style.size.clamp(12.0, 64.0),
+                  value: style.size.clamp(12.0, 400.0),
                   min: 12.0,
-                  max: 64.0,
+                  max: 400.0,
                   activeColor: _darkBlack,
                   thumbColor: _limeAccent,
                   inactiveColor: const Color(0xFFE2E8F0),
@@ -2260,8 +2652,8 @@ class _EditorScreenState extends State<EditorScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        width: 42,
-        height: 42,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: const Color(0xFFF1F5F9),
           border: Border.all(color: _darkBlack, width: 1.5),
@@ -2284,8 +2676,8 @@ class _EditorScreenState extends State<EditorScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          width: 42,
-          height: 42,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: isActive ? _limeAccent : const Color(0xFFF1F5F9),
             border: Border.all(
@@ -2346,7 +2738,24 @@ class _EditorScreenState extends State<EditorScreen> {
                   if (idx == 5) {
                     _pickCustomFrameImage();
                   } else {
-                    setState(() => _frameShapeIndex = idx);
+                    setState(() {
+                      _frameShapeIndex = idx;
+                      if (!widget.template.imageLayers.any((l) => l.type == 'frame')) {
+                        widget.template.imageLayers.add(ImageLayer(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          url: '',
+                          type: 'frame',
+                          maskShape: 'rounded_rect',
+                          x: 0.2, y: 0.2, width: 0.6, height: 0.6,
+                          rotation: 0.0,
+                          opacity: 1.0, 
+                          borderWidth: 0.0,
+                          borderColor: '#000000',
+                          flipHorizontal: false, flipVertical: false, locked: false,
+                        ));
+                        _selectedType = SelectedElementType.photo;
+                      }
+                    });
                     _saveState();
                   }
                 },
@@ -2481,7 +2890,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 ),
                 icon: const Icon(Icons.color_lens_outlined, size: 20),
                 label: const Text(
-                  'Color Tints & Palettes',
+                  'Background Color',
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
@@ -2527,13 +2936,29 @@ class _EditorScreenState extends State<EditorScreen> {
               final isSel = _isFontSelected(font);
               return ListTile(
                 dense: true,
-                title: Text(
-                  font,
-                  style: TextStyle(
-                    color: isSel ? _darkBlack : const Color(0xFF0F172A),
-                    fontSize: 15,
-                    fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
-                  ),
+                title: Builder(
+                  builder: (context) {
+                    try {
+                      return Text(
+                        font,
+                        style: GoogleFonts.getFont(
+                          _getFontFamily(font),
+                          color: isSel ? _darkBlack : const Color(0xFF0F172A),
+                          fontSize: 16,
+                          fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
+                        ),
+                      );
+                    } catch (_) {
+                      return Text(
+                        font,
+                        style: TextStyle(
+                          color: isSel ? _darkBlack : const Color(0xFF0F172A),
+                          fontSize: 16,
+                          fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
+                        ),
+                      );
+                    }
+                  }
                 ),
                 trailing: isSel
                     ? Container(
@@ -2552,6 +2977,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     if (_selectedType == SelectedElementType.dates) _textStyles[SelectedElementType.dates]!.font = font;
                     if (_selectedType == SelectedElementType.tribute) _textStyles[SelectedElementType.tribute]!.font = font;
                   });
+                  _updateActiveTextProperty((layer) => layer.fontFamily = font);
                 },
               );
             },
@@ -2669,6 +3095,21 @@ class _EditorScreenState extends State<EditorScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: const Color(0xFFF8FAFC),
+            child: GestureDetector(
+              onTap: () => setState(() => _activeTray = ActiveTrayType.background),
+              child: Row(
+                children: const [
+                  Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Color(0xFF1E293B)),
+                  SizedBox(width: 6),
+                  Text('Back to Background', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF1E293B))),
+                ],
+              ),
+            ),
+          ),
           // Item 9: Interactive Custom Color Bar
         Padding(
           padding: const EdgeInsets.only(left: 16, right: 16, top: 10, bottom: 6),
@@ -2708,10 +3149,16 @@ class _EditorScreenState extends State<EditorScreen> {
             itemBuilder: (context, idx) {
               final p = palettes[idx];
               final color = p['color'] as Color;
+              final hexValue = '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
               final name = p['name'] as String;
-              final isSel = _canvasBgTint == color;
+              final isSel = widget.template.background.type == 'color' && 
+                            widget.template.background.value.toUpperCase() == hexValue;
               return InkWell(
-                onTap: () => setState(() => _canvasBgTint = color),
+                onTap: () => setState(() {
+                  widget.template.background.type = 'color';
+                  widget.template.background.value = hexValue;
+                  _localBackgroundPath = null;
+                }),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   decoration: BoxDecoration(
@@ -2745,8 +3192,8 @@ class _EditorScreenState extends State<EditorScreen> {
   // DEFAULT MAIN STUDIO DOCK (White + Lime Green Pill Indicator + Item 10 Background tool!)
   Widget _buildMainStudioDock() {
     return Container(
-      height: 90, // Slightly taller to accommodate bigger icons
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      height: 84, // Increased from 74 to prevent RenderFlex overflow
+      padding: const EdgeInsets.symmetric(vertical: 6), // Restored comfortable padding
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
@@ -2801,12 +3248,6 @@ class _EditorScreenState extends State<EditorScreen> {
             isActive: _activeTray == ActiveTrayType.background,
             onTap: () => _toggleTray(ActiveTrayType.background),
           ),
-          _buildDockItem(
-            icon: Icons.palette_outlined,
-            label: 'Theme',
-            isActive: _activeTray == ActiveTrayType.theme,
-            onTap: () => _toggleTray(ActiveTrayType.theme),
-          ),
         ],
       ),
       ),
@@ -2823,12 +3264,12 @@ class _EditorScreenState extends State<EditorScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // increased padding for spacing
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), // decreased padding
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: EdgeInsets.symmetric(horizontal: isActive ? 16 : 4, vertical: isActive ? 6 : 2),
+              padding: EdgeInsets.symmetric(horizontal: isActive ? 16 : 4, vertical: isActive ? 4 : 2),
               decoration: isActive
                   ? BoxDecoration(
                       color: _limeAccent, // Vibrant Lime Green Pill from screenshot!
@@ -2839,10 +3280,10 @@ class _EditorScreenState extends State<EditorScreen> {
               child: Icon(
                 icon,
                 color: isActive ? Colors.black : const Color(0xFF475569),
-                size: 26, // Increased icon size
+                size: 24, // Decreased icon size slightly
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
@@ -2862,7 +3303,7 @@ class _EditorScreenState extends State<EditorScreen> {
     setState(() {
       if (_textStyles.containsKey(_selectedType)) {
         final style = _textStyles[_selectedType]!;
-        style.size = (style.size + delta).clamp(10.0, 64.0);
+        style.size = (style.size + delta).clamp(10.0, 120.0);
       }
     });
   }
@@ -2870,10 +3311,11 @@ class _EditorScreenState extends State<EditorScreen> {
   void _showPositionSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) => Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 116.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2911,9 +3353,10 @@ class _EditorScreenState extends State<EditorScreen> {
   void _showNudgeSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 116.0),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -2941,6 +3384,7 @@ class _EditorScreenState extends State<EditorScreen> {
     // We need state inside the bottom sheet to update the slider
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.white,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
@@ -2951,7 +3395,7 @@ class _EditorScreenState extends State<EditorScreen> {
             currentOpacity = _activeTextLayer!.opacity;
           }
           return Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 124.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -3109,10 +3553,11 @@ class _EditorScreenState extends State<EditorScreen> {
   void _showFlipSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 124.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -3156,27 +3601,73 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Future<void> _cropSelectedImage() async {
-    if (_selectedType != SelectedElementType.photo && _selectedType != SelectedElementType.overlay) return;
-    
-    String? sourceUrl;
-    if (_selectedType == SelectedElementType.photo) {
+    if (_selectedType != SelectedElementType.photo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cropping is only supported for the main photo.')),
+      );
+      return;
+    }
+
+    String? imagePath = _localPhotoPath;
+
+    if (imagePath == null) {
+      // Download the template's default frame photo
       final layer = widget.template.imageLayers.firstWhere((i) => i.type == 'frame');
-      sourceUrl = layer.url;
-    } else if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
-      final item = _overlayItems.firstWhere((i) => i.id == _selectedOverlayId);
-      if (item.graphic.isImageOverlay) {
-        sourceUrl = '${ApiService.baseUrl}/flowers/${item.graphic.imageFile}';
+      final url = layer.url;
+      if (url != null && url.isNotEmpty) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Downloading photo for cropping...')),
+          );
+          final response = await http.get(Uri.parse(url));
+          final documentDirectory = await getTemporaryDirectory();
+          final file = File("${documentDirectory.path}/temp_photo_to_crop.png");
+          await file.writeAsBytes(response.bodyBytes);
+          imagePath = file.path;
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error downloading image: $e')),
+          );
+          return;
+        }
       }
     }
-    
-    if (sourceUrl == null) return;
-    
-    // In a real app we'd download the image, save to temp, then crop. 
-    // Since this is network image, we might need to fetch it first.
-    // For now, this is a stub as per implementation plan to show UI.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Cropping requires downloading network images first (Stub).')),
-    );
+
+    if (imagePath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload a photo first to crop.')),
+      );
+      return;
+    }
+
+    try {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: imagePath,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Photo',
+            toolbarColor: _darkBlack,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+          ),
+          IOSUiSettings(
+            title: 'Crop Photo',
+          ),
+        ],
+      );
+
+      if (croppedFile != null) {
+        setState(() {
+          _localPhotoPath = croppedFile.path;
+        });
+        _saveState();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cropping failed: $e')),
+      );
+    }
   }
 
   Widget _buildSecondaryToolbar() {
@@ -3234,11 +3725,7 @@ class _EditorScreenState extends State<EditorScreen> {
           _buildSecondaryToolbarButton(
             icon: Icons.group_work_outlined,
             label: 'Group',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Long-press items to multi-select, then tap Group (Coming soon)')),
-              );
-            },
+            onTap: _showGroupSheet,
           ),
         ],
       ),
@@ -3278,6 +3765,193 @@ class _EditorScreenState extends State<EditorScreen> {
     _saveState();
   }
 
+  void _showGroupSheet() {
+    // Find currently active/selected layer id and its groupId
+    String? selectedId;
+    String? selectedGroupId;
+    
+    if (_selectedType == SelectedElementType.overlay && _selectedOverlayId != null) {
+      selectedId = _selectedOverlayId;
+      try {
+        final item = _overlayItems.firstWhere((i) => i.id == selectedId);
+        selectedGroupId = item.groupId;
+      } catch (_) {}
+    } else if (_activeTextLayer != null) {
+      selectedId = _activeTextLayer!.id;
+      selectedGroupId = _activeTextLayer!.groupId;
+    } else if (_selectedType == SelectedElementType.photo) {
+      try {
+        final layer = widget.template.imageLayers.firstWhere((i) => i.type == 'frame');
+        selectedId = layer.id;
+        selectedGroupId = layer.groupId;
+      } catch (_) {}
+    }
+
+    final allLayers = _getAllLayersMetadata();
+    
+    // Set of selected layer IDs in the checklist
+    final checkedIds = <String>{};
+    
+    // Pre-populate checkedIds
+    if (selectedGroupId != null && selectedGroupId.isNotEmpty) {
+      for (var l in allLayers) {
+        final obj = l['obj'];
+        String? gid;
+        if (obj is TextLayer) gid = obj.groupId;
+        else if (obj is ImageLayer) gid = obj.groupId;
+        else if (obj is ShapeLayer) gid = obj.groupId;
+        else if (obj is CanvasOverlayItem) gid = obj.groupId;
+        
+        if (gid == selectedGroupId) {
+          checkedIds.add(l['id'] as String);
+        }
+      }
+    } else if (selectedId != null) {
+      checkedIds.add(selectedId);
+    }
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 116.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Group Layers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _darkBlack)),
+                    if (selectedGroupId != null && selectedGroupId.isNotEmpty)
+                      TextButton.icon(
+                        icon: const Icon(Icons.link_off_rounded, color: Colors.redAccent, size: 18),
+                        label: const Text('Ungroup All', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          setState(() {
+                            for (var l in widget.template.textLayers) {
+                              if (l.groupId == selectedGroupId) l.groupId = null;
+                            }
+                            for (var l in widget.template.imageLayers) {
+                              if (l.groupId == selectedGroupId) l.groupId = null;
+                            }
+                            for (var l in widget.template.shapeLayers) {
+                              if (l.groupId == selectedGroupId) l.groupId = null;
+                            }
+                            for (var l in _overlayItems) {
+                              if (l.groupId == selectedGroupId) l.groupId = null;
+                            }
+                          });
+                          _saveState();
+                          Navigator.pop(context);
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('Select the items you want to group together. Moving any item in the group will move them all.', 
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.25),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: allLayers.map((l) {
+                      final id = l['id'] as String;
+                      final isChecked = checkedIds.contains(id);
+                      return CheckboxListTile(
+                        value: isChecked,
+                        activeColor: _limeAccent,
+                        checkColor: Colors.black,
+                        title: Text(l['title'] as String, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        secondary: Icon(l['icon'] as IconData, color: isChecked ? _limeAccent : const Color(0xFF64748B)),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            if (val == true) {
+                              checkedIds.add(id);
+                            } else {
+                              checkedIds.remove(id);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _limeAccent,
+                          foregroundColor: Colors.black,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: const BorderSide(color: _darkBlack, width: 1.5),
+                          ),
+                        ),
+                        onPressed: checkedIds.length < 2 ? null : () {
+                          final newGroupId = DateTime.now().millisecondsSinceEpoch.toString();
+                          setState(() {
+                            // Assign groupId to checked elements, clear for unchecked elements that were part of this group
+                            for (var l in widget.template.textLayers) {
+                              if (checkedIds.contains(l.id)) {
+                                l.groupId = newGroupId;
+                              } else if (l.groupId == selectedGroupId) {
+                                l.groupId = null;
+                              }
+                            }
+                            for (var l in widget.template.imageLayers) {
+                              if (checkedIds.contains(l.id)) {
+                                l.groupId = newGroupId;
+                              } else if (l.groupId == selectedGroupId) {
+                                l.groupId = null;
+                              }
+                            }
+                            for (var l in widget.template.shapeLayers) {
+                              if (checkedIds.contains(l.id)) {
+                                l.groupId = newGroupId;
+                              } else if (l.groupId == selectedGroupId) {
+                                l.groupId = null;
+                              }
+                            }
+                            for (var l in _overlayItems) {
+                              if (checkedIds.contains(l.id)) {
+                                l.groupId = newGroupId;
+                              } else if (l.groupId == selectedGroupId) {
+                                l.groupId = null;
+                              }
+                            }
+                          });
+                          _saveState();
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Group Selected', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildSecondaryToolbarButton({required IconData icon, required String label, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
@@ -3290,6 +3964,59 @@ class _EditorScreenState extends State<EditorScreen> {
             const SizedBox(height: 4),
             Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCornerResizeHandle({
+    required Alignment alignment,
+    required void Function(DragUpdateDetails details) onPanUpdate,
+  }) {
+    double? left, top, right, bottom;
+    if (alignment == Alignment.topLeft) {
+      left = -24;
+      top = -24;
+    } else if (alignment == Alignment.topRight) {
+      right = -24;
+      top = -24;
+    } else if (alignment == Alignment.bottomLeft) {
+      left = -24;
+      bottom = -24;
+    } else if (alignment == Alignment.bottomRight) {
+      right = -24;
+      bottom = -24;
+    }
+
+    return Positioned(
+      left: left,
+      top: top,
+      right: right,
+      bottom: bottom,
+      child: GestureDetector(
+        onPanUpdate: onPanUpdate,
+        onPanEnd: (_) => _saveState(),
+        child: Container(
+          width: 48,
+          height: 48,
+          color: Colors.transparent,
+          alignment: Alignment.center,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF94A3B8), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -3357,7 +4084,7 @@ class _EditorScreenState extends State<EditorScreen> {
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), // Reduced vertical padding
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
@@ -3367,7 +4094,7 @@ class _EditorScreenState extends State<EditorScreen> {
               children: [
                 const Text(
                   'Layers',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)), // Reduced font size slightly
                 ),
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_down_rounded),
@@ -3472,6 +4199,21 @@ class _EditorScreenState extends State<EditorScreen> {
                             else if (obj is ImageLayer) obj.locked = !obj.locked;
                             else if (obj is ShapeLayer) obj.locked = !obj.locked;
                             else if (obj is CanvasOverlayItem) obj.locked = !obj.locked;
+                          });
+                          _saveState();
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.redAccent),
+                        onPressed: () {
+                          setState(() {
+                            if (obj is TextLayer) widget.template.textLayers.remove(obj);
+                            else if (obj is ImageLayer) widget.template.imageLayers.remove(obj);
+                            else if (obj is ShapeLayer) widget.template.shapeLayers.remove(obj);
+                            else if (obj is CanvasOverlayItem) _overlayItems.remove(obj);
+                            
+                            if (obj is TextLayer && _activeTextLayer?.id == obj.id) { _activeTextLayer = null; _selectedType = SelectedElementType.none; }
+                            if ((obj is ImageLayer || obj is ShapeLayer || obj is CanvasOverlayItem) && _selectedOverlayId == obj.id) { _selectedOverlayId = null; _selectedType = SelectedElementType.none; }
                           });
                           _saveState();
                         },

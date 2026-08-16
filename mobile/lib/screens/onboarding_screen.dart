@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../services/user_settings_service.dart';
 import '../theme/theme.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -49,7 +52,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPressed: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
                     },
                     style: TextButton.styleFrom(
@@ -143,19 +146,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             curve: Curves.easeIn,
                           );
                         } else {
-                          // Trigger Google Sign-In
-                          final credential = await AuthService.instance.signInWithGoogle();
-                          if (credential != null && context.mounted) {
+                          // Complete onboarding
+                          await UserSettingsService.instance.setHasSeenOnboarding(true);
+                          if (context.mounted) {
+                            final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+                            final isGuest = UserSettingsService.instance.isGuest;
                             Navigator.pushReplacement(
                               context,
-                              MaterialPageRoute(builder: (_) => const HomeScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => (!isLoggedIn && !isGuest) 
+                                    ? const LoginScreen() 
+                                    : const HomeScreen(),
+                              ),
                             );
-                          } else {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Failed to sign in with Google.')),
-                              );
-                            }
                           }
                         }
                       },
@@ -163,23 +166,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         backgroundColor: _currentPage == _slides.length - 1 ? Colors.white : AppTheme.accentNeon,
                         foregroundColor: AppTheme.textDark,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100),
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        elevation: 5,
+                        shadowColor: Colors.black.withOpacity(0.5),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_currentPage == _slides.length - 1) ...[
-                            // Using a simple icon for Google since we don't have the asset yet
-                            const Icon(Icons.g_mobiledata_rounded, size: 32, color: Colors.blue),
-                            const SizedBox(width: 8),
-                          ],
-                          Text(
-                            _currentPage == _slides.length - 1 ? 'Continue with Google' : 'Next',
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-                          ),
-                        ],
+                      child: Text(
+                        _currentPage == _slides.length - 1 ? 'Get Started' : 'Next',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),

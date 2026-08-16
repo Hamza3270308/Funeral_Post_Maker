@@ -4,6 +4,7 @@ import '../theme/theme.dart';
 import 'onboarding_screen.dart';
 import 'policy_screen.dart';
 import 'saved_designs_screen.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -18,6 +19,16 @@ class SettingsScreen extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
           children: [
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'Settings',
+                  style: const TextStyle(fontSize: 24, letterSpacing: -0.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -44,30 +55,21 @@ class SettingsScreen extends StatelessWidget {
                       settings.toggleNotifications(val);
                     },
                   ),
+
                   _buildDivider(),
-                  _buildSwitchItem(
-                    context,
-                    icon: Icons.dark_mode_outlined,
-                    title: 'Appearance',
-                    subtitle: settings.isDarkMode ? 'Dark Mode' : 'Light Mode',
-                    value: settings.isDarkMode,
-                    onChanged: (val) {
-                      settings.toggleDarkMode(val);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Full Dark Mode coming soon!'),
-                          backgroundColor: AppTheme.accentNeon,
-                        ),
+                  FutureBuilder<PackageInfo>(
+                    future: PackageInfo.fromPlatform(),
+                    builder: (context, snapshot) {
+                      final version = snapshot.data?.version ?? '1.0.0';
+                      final build = snapshot.data?.buildNumber ?? '101';
+                      return _buildOptionItem(
+                        context,
+                        icon: Icons.info_outline_rounded,
+                        title: 'App Version',
+                        subtitle: 'Funeral Post Maker v$version (Build $build)',
+                        onTap: () => _showAppVersionDialog(context),
                       );
                     },
-                  ),
-                  _buildDivider(),
-                  _buildOptionItem(
-                    context,
-                    icon: Icons.info_outline_rounded,
-                    title: 'App Version',
-                    subtitle: 'Funeral Post Maker v1.0.0 (Build 101)',
-                    onTap: () => _showAppVersionDialog(context),
                   ),
                   _buildDivider(),
                   _buildOptionItem(

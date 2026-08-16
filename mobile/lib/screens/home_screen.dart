@@ -7,6 +7,7 @@ import 'favorites_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import '../services/user_settings_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -65,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
             status: 'draft',
             thumbnailUrl: '',
             width: 1080,
-            height: 1080,
+            height: 1920,
             background: Background(type: 'color', value: '#FFFFFF'),
             imageLayers: [],
             textLayers: [],
@@ -183,30 +184,21 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         backgroundColor: AppTheme.lightBackground,
-        appBar: AppBar(
-          title: Text(
-            _activeTabIndex == 4
-                ? 'Settings'
-                : _activeTabIndex == 3
-                    ? 'Profile'
-                    : _activeTabIndex == 1
-                        ? 'Browse'
-                        : 'Hello, User',
-            style: const TextStyle(fontSize: 24, letterSpacing: -0.5),
-          ),
-          centerTitle: false,
-        ),
+        // AppBar removed. Each tab now handles its own header to allow the Editor to hide it naturally.
         body: Stack(
           children: [
-            IndexedStack(
-              index: _activeTabIndex,
-              children: [
-                _buildTabNavigator(0, _buildHomeTab()),
-                _buildTabNavigator(1, _buildBrowseTab()), // Replaced Favorites with Browse
-                _buildTabNavigator(2, Container()), // Create button
-                _buildTabNavigator(3, const ProfileScreen()),
-                _buildTabNavigator(4, const SettingsScreen()),
-              ],
+            SafeArea(
+              bottom: false,
+              child: IndexedStack(
+                index: _activeTabIndex,
+                children: [
+                  _buildTabNavigator(0, _buildHomeTab()),
+                  _buildTabNavigator(1, _buildBrowseTab()), // Replaced Favorites with Browse
+                  _buildTabNavigator(2, Container()), // Create button
+                  _buildTabNavigator(3, const ProfileScreen()),
+                  _buildTabNavigator(4, const SettingsScreen()),
+                ],
+              ),
             ),
             
             // Floating Bottom Navigation Bar
@@ -250,11 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE8EAF6), Color(0xFFC5CAE9)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppTheme.accentNeon.withOpacity(0.3),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -276,8 +264,8 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.add, size: 20),
             label: const Text('Start from Scratch'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF9094CE),
-              foregroundColor: Colors.white,
+              backgroundColor: AppTheme.textDark,
+              foregroundColor: AppTheme.accentNeon,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(100),
@@ -295,8 +283,8 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(100),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -308,8 +296,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: TextField(
           controller: _searchController,
           decoration: InputDecoration(
+            filled: false,
             hintText: 'Search Memorial Templates...',
-            hintStyle: const TextStyle(color: AppTheme.textLight),
+            hintStyle: const TextStyle(color: AppTheme.textGray),
             prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textGray),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
@@ -523,6 +512,18 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 120),
         children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Text(
+                UserSettingsService.instance.isGuest
+                    ? 'Hello, Guest'
+                    : 'Hello, ${FirebaseAuth.instance.currentUser?.displayName?.split(' ').first ?? 'User'}',
+                style: const TextStyle(fontSize: 24, letterSpacing: -0.5, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
           _buildHeroBanner(),
           _buildSearchBar(),
           FutureBuilder<List<Template>>(

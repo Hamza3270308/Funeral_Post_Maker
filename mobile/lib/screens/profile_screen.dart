@@ -26,14 +26,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (context, authSnapshot) {
             final user = AuthService.instance.currentUser;
             
-            final displayName = user?.displayName ?? settings.name;
-            final email = user?.email ?? 'Not signed in';
+            final isGuest = settings.isGuest;
+            final displayName = isGuest ? 'Guest User' : (user?.displayName ?? settings.name);
+            final email = isGuest ? 'Guest accounts cannot save designs' : (user?.email ?? 'Not signed in');
             final photoUrl = user?.photoURL;
             final initials = _getInitials(displayName);
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
               children: [
+                SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      'Profile',
+                      style: const TextStyle(fontSize: 24, letterSpacing: -0.5, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
                 // Profile Card
                 Container(
                   padding: const EdgeInsets.all(20),

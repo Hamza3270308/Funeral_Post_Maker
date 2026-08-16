@@ -7,12 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:19528064541:android:2b01de6366f8eab0b6f0f4",
+        "mobilesdk_app_id": "1:19528064541:android:d64a631650fee42cb6f0f4",
         "android_client_info": {
-          "package_name": "com.hamitech.funeralpostmaker"
+          "package_name": "com.hamitech.customemojimaker"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "19528064541-b92md76ophrd1rbcmc33drd0p23usd97.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAhQJq9JD2IXLJlHzAkGE84muwVk4XYO4I"
@@ -20,7 +25,86 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "19528064541-b92md76ophrd1rbcmc33drd0p23usd97.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:19528064541:android:2b01de6366f8eab0b6f0f4",
+        "android_client_info": {
+          "package_name": "com.hamitech.funeralpostmaker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "19528064541-46jce7gl2e6jpg5shek6neim4bgicv3g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hamitech.funeralpostmaker",
+            "certificate_hash": "54c2e87996f4d54f3761f37e158cb4bdf1cb8bf3"
+          }
+        },
+        {
+          "client_id": "19528064541-bmk90g85ppebcotgff4u8au1qfc6ekqn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hamitech.funeralpostmaker",
+            "certificate_hash": "90954422c3b8a48fe05db2585e6f9d3f44fdbfce"
+          }
+        },
+        {
+          "client_id": "19528064541-b92md76ophrd1rbcmc33drd0p23usd97.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhQJq9JD2IXLJlHzAkGE84muwVk4XYO4I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "19528064541-b92md76ophrd1rbcmc33drd0p23usd97.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:19528064541:android:db08ea23058fff3fb6f0f4",
+        "android_client_info": {
+          "package_name": "com.hamitech.iupacnomenclature"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "19528064541-b92md76ophrd1rbcmc33drd0p23usd97.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhQJq9JD2IXLJlHzAkGE84muwVk4XYO4I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "19528064541-b92md76ophrd1rbcmc33drd0p23usd97.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
