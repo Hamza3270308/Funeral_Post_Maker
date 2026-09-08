@@ -15,47 +15,91 @@ import {
   Wallpaper,
   Layers,
   ChevronLeft,
-  Flower2
+  Flower2,
+  Search,
+  Check,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-const GOOGLE_FONTS_LIBRARY = [
-  'Inter',
-  'Playfair Display',
-  'Roboto',
-  'Georgia',
-  'Cinzel',
-  'Lora',
-  'Cormorant Garamond',
-  'EB Garamond',
-  'Merriweather',
-  'Great Vibes',
-  'Alex Brush',
-  'Pinyon Script',
-  'Parisienne',
-  'Playball',
-  'Dancing Script',
-  'Montserrat',
-  'Lato',
-  'Open Sans',
-  'Raleway',
-  'Bodoni Moda',
-  'Cinzel Decorative',
-  'Cormorant Infant',
-  'Crimson Text',
-  'Marcellus',
-  'Montserrat Alternates',
-  'Cardo',
-  'Italiana',
-  'Prata',
-  'Allura',
-  'Sacramento',
-  'WindSong',
-  'Reenie Beanie',
-  'Satisfy',
-  'Petit Formal Script',
-  'Rouge Script'
+export interface FontDefinition {
+  name: string;
+  category: 'Serif' | 'Script' | 'Sans';
+  fallback: 'serif' | 'cursive' | 'sans-serif';
+}
+
+export const GOOGLE_FONTS_LIBRARY: FontDefinition[] = [
+  // Elegant Serifs & Memorial Classics
+  { name: 'Playfair Display', category: 'Serif', fallback: 'serif' },
+  { name: 'Cinzel', category: 'Serif', fallback: 'serif' },
+  { name: 'Cinzel Decorative', category: 'Serif', fallback: 'serif' },
+  { name: 'Cormorant Garamond', category: 'Serif', fallback: 'serif' },
+  { name: 'Cormorant Infant', category: 'Serif', fallback: 'serif' },
+  { name: 'EB Garamond', category: 'Serif', fallback: 'serif' },
+  { name: 'Lora', category: 'Serif', fallback: 'serif' },
+  { name: 'Bodoni Moda', category: 'Serif', fallback: 'serif' },
+  { name: 'Marcellus', category: 'Serif', fallback: 'serif' },
+  { name: 'Italiana', category: 'Serif', fallback: 'serif' },
+  { name: 'Prata', category: 'Serif', fallback: 'serif' },
+  { name: 'Cardo', category: 'Serif', fallback: 'serif' },
+  { name: 'Crimson Text', category: 'Serif', fallback: 'serif' },
+  { name: 'Crimson Pro', category: 'Serif', fallback: 'serif' },
+  { name: 'Merriweather', category: 'Serif', fallback: 'serif' },
+  { name: 'Castoro', category: 'Serif', fallback: 'serif' },
+  { name: 'Spectral', category: 'Serif', fallback: 'serif' },
+  { name: 'Bellefair', category: 'Serif', fallback: 'serif' },
+  { name: 'Libre Baskerville', category: 'Serif', fallback: 'serif' },
+  { name: 'Gilda Display', category: 'Serif', fallback: 'serif' },
+  { name: 'Unna', category: 'Serif', fallback: 'serif' },
+  { name: 'Vollkorn', category: 'Serif', fallback: 'serif' },
+  { name: 'Georgia', category: 'Serif', fallback: 'serif' },
+
+  // Calligraphy, Scripts & Memorial Cursive
+  { name: 'Great Vibes', category: 'Script', fallback: 'cursive' },
+  { name: 'Pinyon Script', category: 'Script', fallback: 'cursive' },
+  { name: 'Alex Brush', category: 'Script', fallback: 'cursive' },
+  { name: 'Parisienne', category: 'Script', fallback: 'cursive' },
+  { name: 'Allura', category: 'Script', fallback: 'cursive' },
+  { name: 'Dancing Script', category: 'Script', fallback: 'cursive' },
+  { name: 'Sacramento', category: 'Script', fallback: 'cursive' },
+  { name: 'WindSong', category: 'Script', fallback: 'cursive' },
+  { name: 'Playball', category: 'Script', fallback: 'cursive' },
+  { name: 'Satisfy', category: 'Script', fallback: 'cursive' },
+  { name: 'Petit Formal Script', category: 'Script', fallback: 'cursive' },
+  { name: 'Rouge Script', category: 'Script', fallback: 'cursive' },
+  { name: 'Herr Von Muellerhoff', category: 'Script', fallback: 'cursive' },
+  { name: 'Tangerine', category: 'Script', fallback: 'cursive' },
+  { name: 'Marck Script', category: 'Script', fallback: 'cursive' },
+  { name: 'Italianno', category: 'Script', fallback: 'cursive' },
+  { name: 'Monsieur La Doulaise', category: 'Script', fallback: 'cursive' },
+  { name: 'Meddon', category: 'Script', fallback: 'cursive' },
+  { name: 'Lovers Quarrel', category: 'Script', fallback: 'cursive' },
+  { name: 'Qwigley', category: 'Script', fallback: 'cursive' },
+  { name: 'Reenie Beanie', category: 'Script', fallback: 'cursive' },
+
+  // Clean Modern Sans-Serifs
+  { name: 'Inter', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Montserrat', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Montserrat Alternates', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Lato', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Open Sans', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Roboto', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Raleway', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Poppins', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Outfit', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Plus Jakarta Sans', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Jost', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Quicksand', category: 'Sans', fallback: 'sans-serif' },
+  { name: 'Tenor Sans', category: 'Sans', fallback: 'sans-serif' },
 ];
+
+export function getFontFamilyCss(fontName?: string): string {
+  if (!fontName) return "'Inter', sans-serif";
+  const def = GOOGLE_FONTS_LIBRARY.find(f => f.name.toLowerCase() === fontName.toLowerCase());
+  const fallback = def ? def.fallback : 'sans-serif';
+  return `'${fontName}', ${fallback}`;
+}
 
 export default function CreatorStudioPage() {
   return (
@@ -182,6 +226,8 @@ function CreatorStudio() {
   const [isDraggingCustom, setIsDraggingCustom] = useState(false);
 
   const [showFontDropdown, setShowFontDropdown] = useState(false);
+  const [fontSearchQuery, setFontSearchQuery] = useState('');
+  const [selectedFontCategory, setSelectedFontCategory] = useState<'All' | 'Serif' | 'Script' | 'Sans'>('All');
   const [shapeGradientType, setShapeGradientType] = useState<'two-color' | 'transparent'>('two-color');
 
   const selectLayer = useCallback((id: string | null) => {
@@ -243,18 +289,38 @@ function CreatorStudio() {
   const historyIndexRef = useRef(-1);
   const [clipboard, setClipboard] = useState<Layer | null>(null);
 
-  // Load Google Fonts Library on mount
+  // Load Google Fonts Library on mount (batched for reliable font loading)
   useEffect(() => {
-    const fontParams = GOOGLE_FONTS_LIBRARY.map(font => `family=${font.replace(/\s+/g, '+')}`).join('&');
-    const href = `https://fonts.googleapis.com/css2?${fontParams}&display=swap`;
-    
-    const id = 'google-fonts-library';
-    if (!document.getElementById(id)) {
-      const link = document.createElement('link');
-      link.id = id;
-      link.rel = 'stylesheet';
-      link.href = href;
-      document.head.appendChild(link);
+    // Preconnect to Google Fonts CDN
+    if (!document.getElementById('google-fonts-preconnect-1')) {
+      const pre1 = document.createElement('link');
+      pre1.id = 'google-fonts-preconnect-1';
+      pre1.rel = 'preconnect';
+      pre1.href = 'https://fonts.googleapis.com';
+      document.head.appendChild(pre1);
+
+      const pre2 = document.createElement('link');
+      pre2.id = 'google-fonts-preconnect-2';
+      pre2.rel = 'preconnect';
+      pre2.href = 'https://fonts.gstatic.com';
+      pre2.crossOrigin = 'anonymous';
+      document.head.appendChild(pre2);
+    }
+
+    const batchSize = 10;
+    const fontNames = GOOGLE_FONTS_LIBRARY.map(f => f.name).filter(f => f !== 'Georgia');
+    for (let i = 0; i < fontNames.length; i += batchSize) {
+      const batch = fontNames.slice(i, i + batchSize);
+      const linkId = `google-fonts-batch-${i}`;
+      if (!document.getElementById(linkId)) {
+        const fontParams = batch.map(font => `family=${font.replace(/\s+/g, '+')}`).join('&');
+        const href = `https://fonts.googleapis.com/css2?${fontParams}&display=swap`;
+        const link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+      }
     }
   }, []);
 
@@ -1527,7 +1593,7 @@ function CreatorStudio() {
                         style={{ 
                           fontSize: (layer.fontSize || 16) * scale, 
                           color: layer.color,
-                          fontFamily: (layer.fontFamily || 'Inter') + ', sans-serif',
+                          fontFamily: getFontFamilyCss(layer.fontFamily),
                           fontWeight: layer.fontWeight || 'normal',
                           fontStyle: layer.fontStyle || 'normal',
                           textShadow: (layer.shadowOffsetX || layer.shadowOffsetY || layer.shadowBlur) 
@@ -1625,7 +1691,7 @@ function CreatorStudio() {
                                 <span style={{
                                   fontSize: (child.fontSize || 16) * scale,
                                   color: child.color,
-                                  fontFamily: (child.fontFamily || 'Inter') + ', sans-serif',
+                                  fontFamily: getFontFamilyCss(child.fontFamily),
                                   fontWeight: child.fontWeight || 'normal',
                                   fontStyle: child.fontStyle || 'normal',
                                   textDecoration: child.textDecoration || 'none',
@@ -2372,68 +2438,219 @@ function CreatorStudio() {
                 />
               </div>
 
+              {/* Font Family Selector with Visual Live Previews */}
               <div className="input-group" style={{ position: 'relative' }}>
-                <label>Font Family</label>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Font Family</span>
+                  <span style={{ fontSize: '10px', color: 'var(--accent-color)', fontWeight: '600' }}>
+                    {GOOGLE_FONTS_LIBRARY.length} fonts
+                  </span>
+                </label>
                 <div 
                   onClick={() => setShowFontDropdown(!showFontDropdown)}
                   style={{
                     padding: '8px 12px',
-                    border: '1px solid var(--border-color)',
+                    border: showFontDropdown ? '1.5px solid var(--accent-color)' : '1px solid var(--border-color)',
                     borderRadius: 'var(--radius-sm)',
                     background: 'var(--surface-color)',
                     cursor: 'pointer',
-                    fontFamily: activeLayer.fontFamily || 'Inter',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    fontSize: '14px'
+                    boxShadow: showFontDropdown ? '0 0 0 3px rgba(197, 168, 128, 0.15)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  {activeLayer.fontFamily || 'Inter'}
-                  <span style={{ fontSize: '10px' }}>▼</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                      {activeLayer.fontFamily || 'Inter'}
+                    </span>
+                    <span style={{ 
+                      fontFamily: getFontFamilyCss(activeLayer.fontFamily), 
+                      fontSize: '15px', 
+                      color: 'var(--accent-color)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      In Loving Memory
+                    </span>
+                  </div>
+                  <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transform: showFontDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </div>
+
                 {showFontDropdown && (
                   <>
                     <div 
-                      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }} 
+                      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} 
                       onClick={() => setShowFontDropdown(false)} 
                     />
                     <div style={{
                       position: 'absolute',
                       top: '100%',
-                      left: 0,
-                      right: 0,
-                      maxHeight: '250px',
-                      overflowY: 'auto',
+                      left: '-20px',
+                      right: '-20px',
+                      maxHeight: '420px',
+                      display: 'flex',
+                      flexDirection: 'column',
                       background: 'var(--surface-color)',
                       border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-sm)',
-                      zIndex: 100,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      marginTop: '4px'
+                      borderRadius: 'var(--radius-md)',
+                      zIndex: 999,
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                      marginTop: '6px',
+                      overflow: 'hidden'
                     }}>
-                      {GOOGLE_FONTS_LIBRARY.map(font => (
-                        <div 
-                          key={font}
-                          onClick={() => {
-                            updateLayer(activeLayer.id, { fontFamily: font });
-                            setShowFontDropdown(false);
-                          }}
-                          style={{
-                            padding: '10px 12px',
-                            cursor: 'pointer',
-                            fontFamily: font,
-                            fontSize: '16px',
-                            backgroundColor: (activeLayer.fontFamily || 'Inter') === font ? 'var(--accent-color)' : 'transparent',
-                            color: (activeLayer.fontFamily || 'Inter') === font ? 'white' : 'var(--text-color)',
-                            borderBottom: '1px solid var(--border-color)'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = (activeLayer.fontFamily || 'Inter') === font ? 'var(--accent-color)' : 'rgba(0,0,0,0.05)'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = (activeLayer.fontFamily || 'Inter') === font ? 'var(--accent-color)' : 'transparent'}
-                        >
-                          {font}
+                      {/* Search Bar & Header */}
+                      <div style={{ padding: '12px 12px 8px 12px', borderBottom: '1px solid var(--border-color)', background: '#FAFAFA' }}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--text-secondary)' }} />
+                          <input 
+                            type="text"
+                            placeholder="Search font (e.g. Script, Serif, Cinzel)..."
+                            value={fontSearchQuery}
+                            onChange={(e) => setFontSearchQuery(e.target.value)}
+                            autoFocus
+                            style={{
+                              width: '100%',
+                              padding: '8px 28px 8px 30px',
+                              fontSize: '12px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--border-color)',
+                              outline: 'none',
+                              background: 'white'
+                            }}
+                          />
+                          {fontSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setFontSearchQuery('')}
+                              style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                            >
+                              <X size={13} style={{ color: 'var(--text-secondary)' }} />
+                            </button>
+                          )}
                         </div>
-                      ))}
+
+                        {/* Category Filter Pills */}
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                          {(['All', 'Serif', 'Script', 'Sans'] as const).map(cat => {
+                            const count = cat === 'All' 
+                              ? GOOGLE_FONTS_LIBRARY.length 
+                              : GOOGLE_FONTS_LIBRARY.filter(f => f.category === cat).length;
+                            const isSelected = selectedFontCategory === cat;
+                            return (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => setSelectedFontCategory(cat)}
+                                style={{
+                                  flex: 1,
+                                  padding: '4px 0',
+                                  fontSize: '11px',
+                                  fontWeight: isSelected ? '700' : '500',
+                                  borderRadius: '4px',
+                                  border: isSelected ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
+                                  background: isSelected ? 'var(--accent-color)' : 'white',
+                                  color: isSelected ? 'white' : 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                {cat} <span style={{ opacity: isSelected ? 0.9 : 0.6, fontSize: '10px' }}>({count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Scrollable Font Cards with Visual Typography Previews */}
+                      <div style={{ overflowY: 'auto', flex: 1, maxHeight: '310px', padding: '6px' }}>
+                        {GOOGLE_FONTS_LIBRARY
+                          .filter(f => {
+                            const matchesCat = selectedFontCategory === 'All' || f.category === selectedFontCategory;
+                            const matchesQuery = !fontSearchQuery.trim() || f.name.toLowerCase().includes(fontSearchQuery.toLowerCase().trim());
+                            return matchesCat && matchesQuery;
+                          })
+                          .map(font => {
+                            const isSelected = (activeLayer.fontFamily || 'Inter').toLowerCase() === font.name.toLowerCase();
+                            return (
+                              <div
+                                key={font.name}
+                                onClick={() => {
+                                  updateLayer(activeLayer.id, { fontFamily: font.name });
+                                  setShowFontDropdown(false);
+                                  setFontSearchQuery('');
+                                }}
+                                style={{
+                                  padding: '10px 12px',
+                                  marginBottom: '4px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  cursor: 'pointer',
+                                  backgroundColor: isSelected ? 'rgba(197, 168, 128, 0.12)' : 'transparent',
+                                  border: isSelected ? '1.5px solid var(--accent-color)' : '1px solid transparent',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px',
+                                  transition: 'all 0.12s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.03)';
+                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                    e.currentTarget.style.borderColor = 'transparent';
+                                  }
+                                }}
+                              >
+                                {/* Font Name Header Row */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: '700', color: isSelected ? 'var(--accent-color)' : 'var(--text-primary)' }}>
+                                    {font.name}
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ 
+                                      fontSize: '9px', 
+                                      fontWeight: '600', 
+                                      padding: '1px 6px', 
+                                      borderRadius: '3px', 
+                                      background: font.category === 'Script' ? '#FEF3C7' : (font.category === 'Serif' ? '#E0E7FF' : '#F3F4F6'),
+                                      color: font.category === 'Script' ? '#92400E' : (font.category === 'Serif' ? '#3730A3' : '#374151')
+                                    }}>
+                                      {font.category}
+                                    </span>
+                                    {isSelected && <Check size={14} style={{ color: 'var(--accent-color)' }} />}
+                                  </div>
+                                </div>
+
+                                {/* Actual Font Visual Preview */}
+                                <div style={{ 
+                                  fontFamily: getFontFamilyCss(font.name), 
+                                  fontSize: font.category === 'Script' ? '22px' : '19px', 
+                                  color: 'var(--text-primary)',
+                                  marginTop: '2px',
+                                  lineHeight: '1.2'
+                                }}>
+                                  In Loving Memory
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {GOOGLE_FONTS_LIBRARY.filter(f => {
+                          const matchesCat = selectedFontCategory === 'All' || f.category === selectedFontCategory;
+                          const matchesQuery = !fontSearchQuery.trim() || f.name.toLowerCase().includes(fontSearchQuery.toLowerCase().trim());
+                          return matchesCat && matchesQuery;
+                        }).length === 0 && (
+                          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                            No fonts found matching &quot;{fontSearchQuery}&quot;
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
