@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/template.dart';
 
-import 'dart:io' show Platform;
-
 class ApiService {
   // 10.0.2.2 is for Android emulator, 127.0.0.1 is for iOS simulator.
   static String baseUrl = 'https://q14c5cff8kaukmncrx1w60rf.31.97.48.137.sslip.io';
