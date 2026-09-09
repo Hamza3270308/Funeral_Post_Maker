@@ -524,6 +524,8 @@ function CreatorStudio() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const loadedText = (data.textLayers || []).map((l: any) => ({
           id: l.id,
+          name: l.name || undefined,
+          locked: l.locked || false,
           type: 'text',
           content: l.content,
           fontFamily: l.fontFamily,
@@ -546,6 +548,9 @@ function CreatorStudio() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const loadedImage = (data.imageLayers || []).map((l: any) => ({
           id: l.id,
+          name: l.name || undefined,
+          locked: l.locked || false,
+          frameStyle: l.frameStyle || 'simple',
           type: l.type === 'frame' ? 'image_frame' : 'image',
           src: l.url,
           shape: l.type === 'frame' 
@@ -559,6 +564,10 @@ function CreatorStudio() {
           opacity: l.opacity !== undefined ? l.opacity : 1,
           borderWidth: (l.borderWidth || 0) * w,
           borderColor: l.borderColor || '#000000',
+          borderRadius: (l.borderRadius || 0) * w,
+          imageScale: l.imageScale || 1,
+          imageOffsetX: l.imageOffsetX || 0,
+          imageOffsetY: l.imageOffsetY || 0,
           mixBlendMode: l.mixBlendMode || 'normal',
           visible: true,
           zIndex: l.zIndex !== undefined ? l.zIndex : 0
@@ -567,6 +576,8 @@ function CreatorStudio() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const loadedShape = (data.shapeLayers || []).map((l: any) => ({
           id: l.id,
+          name: l.name || undefined,
+          locked: l.locked || false,
           type: 'shape',
           shape: l.shape || 'square',
           color: l.color || '#4A6572',
@@ -577,6 +588,7 @@ function CreatorStudio() {
           opacity: l.opacity !== undefined ? l.opacity : 1,
           borderWidth: (l.borderWidth || 0) * w,
           borderColor: l.borderColor || '#000000',
+          borderRadius: (l.borderRadius || 0) * w,
           rotation: l.rotation || 0,
           visible: true,
           zIndex: l.zIndex !== undefined ? l.zIndex : 0
@@ -1046,6 +1058,8 @@ function CreatorStudio() {
       if (l.type === 'text') {
         textLayers.push({
           id: l.id,
+          name: l.name,
+          locked: l.locked || false,
           content: l.content || 'Text',
           fontFamily: l.fontFamily || 'Inter',
           fontSize: (l.fontSize || 16) / w,
@@ -1075,6 +1089,9 @@ function CreatorStudio() {
       } else if (l.type === 'image_frame' || l.type === 'image') {
         imageLayers.push({
           id: l.id,
+          name: l.name,
+          locked: l.locked || false,
+          frameStyle: l.frameStyle || 'simple',
           type: l.type === 'image_frame' ? 'frame' : 'sticker',
           url: l.src || '',
           maskShape: l.type === 'image_frame' 
@@ -1088,12 +1105,18 @@ function CreatorStudio() {
           opacity: l.opacity !== undefined ? l.opacity : 1,
           borderWidth: (l.borderWidth || 0) / w,
           borderColor: l.borderColor || '#000000',
+          borderRadius: (l.borderRadius || 0) / w,
+          imageScale: l.imageScale || 1,
+          imageOffsetX: l.imageOffsetX || 0,
+          imageOffsetY: l.imageOffsetY || 0,
           mixBlendMode: l.mixBlendMode || 'normal',
           zIndex: idx
         });
       } else if (l.type === 'shape') {
         shapeLayers.push({
           id: l.id,
+          name: l.name,
+          locked: l.locked || false,
           shape: l.shape || 'square',
           color: l.color || '#4A6572',
           x: l.x / w,
@@ -1103,6 +1126,7 @@ function CreatorStudio() {
           opacity: l.opacity !== undefined ? l.opacity : 1,
           borderWidth: (l.borderWidth || 0) / w,
           borderColor: l.borderColor || '#000000',
+          borderRadius: (l.borderRadius || 0) / w,
           rotation: l.rotation || 0,
           zIndex: idx
         });

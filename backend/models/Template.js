@@ -5,6 +5,8 @@ const Schema = mongoose.Schema;
 // Sub-schemas for the structured layers
 const TextLayerSchema = new Schema({
   id: { type: String, required: true },
+  name: { type: String },
+  locked: { type: Boolean, default: false },
   content: { type: String, required: true },
   fontFamily: { type: String, default: 'Inter' },
   fontSize: { type: Number, default: 16 },
@@ -44,6 +46,9 @@ const TextLayerSchema = new Schema({
 
 const ImageLayerSchema = new Schema({
   id: { type: String, required: true },
+  name: { type: String },
+  locked: { type: Boolean, default: false },
+  frameStyle: { type: String, default: 'simple' },
   type: { type: String, enum: ['frame', 'sticker'], required: true },
   url: { type: String }, // Placeholder URL or actual sticker URL
   maskShape: { type: String, enum: ['none', 'circle', 'rounded_rect'], default: 'none' },
@@ -70,6 +75,8 @@ const ImageLayerSchema = new Schema({
 
 const ShapeLayerSchema = new Schema({
   id: { type: String, required: true },
+  name: { type: String },
+  locked: { type: Boolean, default: false },
   shape: { type: String, enum: ['circle', 'square', 'rounded-rectangle', 'oval', 'arch', 'line', 'triangle'], default: 'square' },
   color: { type: String, default: '#4A6572' },
   x: { type: Number, required: true },
