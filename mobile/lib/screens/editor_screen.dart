@@ -285,6 +285,23 @@ class _EditorScreenState extends State<EditorScreen> {
     'Rouge Script',
   ];
 
+  static final Map<String, TextStyle> _fontStyleCache = {};
+
+  TextStyle _getCachedFontStyle(String fontName) {
+    if (_fontStyleCache.containsKey(fontName)) {
+      return _fontStyleCache[fontName]!;
+    }
+    try {
+      final style = GoogleFonts.getFont(_getFontFamily(fontName));
+      _fontStyleCache[fontName] = style;
+      return style;
+    } catch (_) {
+      final fallback = TextStyle(fontFamily: _getFontFamily(fontName));
+      _fontStyleCache[fontName] = fallback;
+      return fallback;
+    }
+  }
+
   late Map<SelectedElementType, TextLayerStyle> _textStyles;
   TextLayer? _activeTextLayer;
   
@@ -378,10 +395,15 @@ class _EditorScreenState extends State<EditorScreen> {
     final stickerLayers = widget.template.imageLayers.where((l) => l.type == 'sticker').toList();
     for (var layer in stickerLayers) {
       if (layer.url.isNotEmpty) {
-        final filename = layer.url.split('/').last;
+        final cleanFileName = layer.url.split('/').last.split('?').first;
         final graphic = MemorialElementsLibrary.graphics.firstWhere(
-          (g) => g.imageFile == filename,
-          orElse: () => MemorialElementsLibrary.graphics.first, // fallback
+          (g) => g.imageFile == cleanFileName,
+          orElse: () => MemorialGraphic(
+            id: 'sticker_${layer.id}',
+            category: 'Floral Designs',
+            name: 'Sticker',
+            imageFile: layer.url.startsWith('/') ? layer.url.substring(1) : layer.url,
+          ),
         );
         _overlayItems.add(CanvasOverlayItem(
           id: layer.id,
@@ -1321,15 +1343,21 @@ class _EditorScreenState extends State<EditorScreen> {
     }
 
     final bgValue = ApiService.resolveImageUrl(bg.value);
-    if (bgValue.isNotEmpty && (bgValue.startsWith('http') || bgValue.startsWith('assets/'))) {
-      final imageProvider = bgValue.startsWith('http')
-          ? NetworkImage(bgValue)
-          : AssetImage(bgValue) as ImageProvider;
-      return Image(
-        image: imageProvider,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-      );
+    if (bgValue.isNotEmpty) {
+      if (bgValue.startsWith('assets/')) {
+        return Image.asset(
+          bgValue,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        );
+      } else if (bgValue.startsWith('http')) {
+        return CachedNetworkImage(
+          imageUrl: bgValue,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(color: const Color(0xFFF1F5F9)),
+          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        );
+      }
     }
     return const SizedBox.shrink();
   }
@@ -1776,10 +1804,18 @@ class _EditorScreenState extends State<EditorScreen> {
     // Check if the template has a remote URL for the frame
     final resolvedUrl = ApiService.resolveImageUrl(layer.url);
     if (resolvedUrl.isNotEmpty) {
-      return Image.network(
-        resolvedUrl,
+      if (resolvedUrl.startsWith('assets/')) {
+        return Image.asset(
+          resolvedUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildPortraitPlaceholder(),
+        );
+      }
+      return CachedNetworkImage(
+        imageUrl: resolvedUrl,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildPortraitPlaceholder(),
+        placeholder: (_, __) => _buildPortraitPlaceholder(),
+        errorWidget: (_, __, ___) => _buildPortraitPlaceholder(),
       );
     }
     
@@ -1832,8 +1868,11 @@ class _EditorScreenState extends State<EditorScreen> {
 
       Widget overlayChild;
       if (item.graphic.isImageOverlay) {
-        // Real PNG floral image from backend (with local assets bundle for 0ms loading)
-        final imageUrl = '${ApiService.baseUrl}/flowers/${item.graphic.imageFile}';
+        final rawFile = item.graphic.imageFile ?? '';
+        final cleanFileName = rawFile.split('/').last.split('?').first;
+        final resolvedUrl = ApiService.resolveImageUrl(
+          rawFile.startsWith('/') || rawFile.startsWith('http') ? rawFile : '/flowers/$rawFile'
+        );
         final imgW = w * 0.9 * item.scale;
         overlayChild = SizedBox(
           width: imgW,
@@ -1843,10 +1882,10 @@ class _EditorScreenState extends State<EditorScreen> {
               scaleX: item.flipHorizontal ? -1.0 : 1.0,
               scaleY: item.flipVertical ? -1.0 : 1.0,
               child: Image.asset(
-                'assets/flowers/${item.graphic.imageFile}',
+                'assets/flowers/$cleanFileName',
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => CachedNetworkImage(
-                  imageUrl: imageUrl,
+                  imageUrl: resolvedUrl,
                   fit: BoxFit.contain,
                   placeholder: (_, __) => const Center(
                     child: SizedBox(
@@ -2967,31 +3006,16 @@ class _EditorScreenState extends State<EditorScreen> {
             itemBuilder: (context, idx) {
               final font = allWebGoogleFonts[idx];
               final isSel = _isFontSelected(font);
+              final baseStyle = _getCachedFontStyle(font);
               return ListTile(
                 dense: true,
-                title: Builder(
-                  builder: (context) {
-                    try {
-                      return Text(
-                        font,
-                        style: GoogleFonts.getFont(
-                          _getFontFamily(font),
-                          color: isSel ? _darkBlack : const Color(0xFF0F172A),
-                          fontSize: 16,
-                          fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
-                        ),
-                      );
-                    } catch (_) {
-                      return Text(
-                        font,
-                        style: TextStyle(
-                          color: isSel ? _darkBlack : const Color(0xFF0F172A),
-                          fontSize: 16,
-                          fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
-                        ),
-                      );
-                    }
-                  }
+                title: Text(
+                  font,
+                  style: baseStyle.copyWith(
+                    color: isSel ? _darkBlack : const Color(0xFF0F172A),
+                    fontSize: 16,
+                    fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
+                  ),
                 ),
                 trailing: isSel
                     ? Container(
