@@ -112,6 +112,7 @@ export default function CreatorStudioPage() {
 interface Layer {
   id: string;
   type: string;
+  name?: string;
   content?: string;
   fontFamily?: string;
   fontSize?: number;
@@ -762,10 +763,11 @@ function CreatorStudio() {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const renderFrameOverlay = (frameStyle: string | undefined, shape: string | undefined) => {
+  const renderFrameOverlay = (frameStyle: string | undefined, shape: string | undefined, layer?: Layer) => {
     if (!frameStyle || frameStyle === 'simple') return null;
 
-    const borderRadius = shape === 'circle' ? '50%' : (shape === 'rounded-rectangle' ? '20px' : '0');
+    const customRadius = layer?.borderRadius !== undefined ? `${layer.borderRadius * scale}px` : (shape === 'rounded-rectangle' ? '20px' : '0');
+    const borderRadius = shape === 'circle' || shape === 'oval' ? '50%' : (shape === 'arch' ? '200px 200px 0 0' : customRadius);
 
     if (frameStyle === 'gold') {
       return (
@@ -1178,7 +1180,12 @@ function CreatorStudio() {
   const getShapeBorderRadius = (layer: Layer | undefined) => {
     if (!layer) return '0';
     const shape = layer.shape;
-    if (!shape) return '0';
+    if (!shape) {
+      if (layer.type === 'image_frame' && layer.borderRadius !== undefined) {
+        return `${layer.borderRadius * scale}px`;
+      }
+      return '0';
+    }
     if (shape === 'circle' || shape === 'oval') return '50%';
     if (shape === 'arch') return '200px 200px 0 0';
     if (shape === 'rounded-rectangle' || shape === 'square') {
@@ -1186,6 +1193,33 @@ function CreatorStudio() {
       return `${radiusVal * scale}px`;
     }
     return '0';
+  };
+
+  const getLayerDisplayName = (layer: Layer, allLayers: Layer[]) => {
+    if (layer.name && layer.name.trim() !== '') {
+      return layer.name;
+    }
+    if (layer.type === 'text') {
+      return layer.content && layer.content.trim() ? (layer.content.length > 22 ? layer.content.substring(0, 22) + '...' : layer.content) : 'Text';
+    }
+    if (layer.type === 'shape') {
+      const shapeLabel = layer.shape ? (layer.shape.charAt(0).toUpperCase() + layer.shape.slice(1).replace('-', ' ')) : 'Square';
+      const sameTypeIndex = allLayers.filter(l => l.type === 'shape').findIndex(l => l.id === layer.id) + 1;
+      return `Shape ${sameTypeIndex || 1} (${shapeLabel})`;
+    }
+    if (layer.type === 'image_frame') {
+      const frameLabel = layer.frameStyle ? (layer.frameStyle.charAt(0).toUpperCase() + layer.frameStyle.slice(1)) : 'Custom';
+      const sameTypeIndex = allLayers.filter(l => l.type === 'image_frame').findIndex(l => l.id === layer.id) + 1;
+      return `Frame ${sameTypeIndex || 1} (${frameLabel})`;
+    }
+    if (layer.type === 'image') {
+      const sameTypeIndex = allLayers.filter(l => l.type === 'image').findIndex(l => l.id === layer.id) + 1;
+      return `Photo ${sameTypeIndex || 1}`;
+    }
+    if (layer.type === 'group') {
+      return 'Group';
+    }
+    return 'Layer';
   };
 
   const getLayerIcon = (type: string) => {
@@ -1261,8 +1295,8 @@ function CreatorStudio() {
                               <GripVertical size={14} />
                             </span>
                             {getLayerIcon(layer.type)}
-                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
-                              {layer.type === 'text' ? layer.content : layer.type === 'shape' ? 'Shape' : 'Image Frame'}
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '130px' }} title={getLayerDisplayName(layer, layers)}>
+                              {getLayerDisplayName(layer, layers)}
                             </span>
                           </div>
                           <div style={{ display: 'flex', gap: '10px' }}>
@@ -1432,8 +1466,8 @@ function CreatorStudio() {
                   position={{ x: 0, y: 0 }}
                   disableDragging={true}
                   dragGrid={snapToGrid ? [10 * scale, 10 * scale] : undefined}
-                  resizeGrid={snapToGrid && layer.type === 'shape' ? [10 * scale, 10 * scale] : undefined}
-                  lockAspectRatio={layer.type !== 'shape'}
+                  resizeGrid={snapToGrid && (layer.type === 'shape' || layer.type === 'image_frame') ? [10 * scale, 10 * scale] : undefined}
+                  lockAspectRatio={layer.type === 'text'}
                   onResizeStop={(e, direction, ref, delta, position) => {
                     setIsDragging(false);
                     const newWidth = ref.offsetWidth / scale;
@@ -1491,16 +1525,16 @@ function CreatorStudio() {
                       }
                     }
                   }}
-                  enableResizing={!layer.locked && activeLayerId === layer.id ? (layer.type === 'shape' ? { top:true, right:true, bottom:true, left:true, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true } : { top:false, right:false, bottom:false, left:false, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true }) : false}
+                  enableResizing={!layer.locked && activeLayerId === layer.id ? ((layer.type === 'shape' || layer.type === 'image_frame') ? { top:true, right:true, bottom:true, left:true, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true } : { top:false, right:false, bottom:false, left:false, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true }) : false}
                   resizeHandleStyles={activeLayerId === layer.id ? {
                     topLeft: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', left: '-5px', top: '-5px' },
                     topRight: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', right: '-5px', top: '-5px' },
                     bottomLeft: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', left: '-5px', bottom: '-5px' },
                     bottomRight: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', right: '-5px', bottom: '-5px' },
-                    top: layer.type === 'shape' ? { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', top: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } : undefined,
-                    bottom: layer.type === 'shape' ? { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', bottom: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } : undefined,
-                    left: layer.type === 'shape' ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', left: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
-                    right: layer.type === 'shape' ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', right: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
+                    top: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', top: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } : undefined,
+                    bottom: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', bottom: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } : undefined,
+                    left: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', left: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
+                    right: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', right: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
                   } : undefined}
                   onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
@@ -1642,7 +1676,7 @@ function CreatorStudio() {
                         ) : (
                           <ImageIcon color="var(--text-muted)" size={40 * scale} />
                         )}
-                        {renderFrameOverlay(layer.frameStyle, layer.shape)}
+                        {renderFrameOverlay(layer.frameStyle, layer.shape, layer)}
                       </>
                     )}
                     {layer.type === 'image' && layer.src && (
@@ -1738,7 +1772,7 @@ function CreatorStudio() {
                                   ) : (
                                     <span style={{ fontSize: '10px', color: '#94A3B8' }}>[Frame]</span>
                                   )}
-                                  {renderFrameOverlay(child.frameStyle, child.shape)}
+                                  {renderFrameOverlay(child.frameStyle, child.shape, child)}
                                 </div>
                               )}
                             </div>
@@ -1818,7 +1852,7 @@ function CreatorStudio() {
                     type="button"
                     className="aspect-ratio-card" 
                     style={{ padding: '15px 10px', borderRadius: 'var(--radius-md)' }}
-                    onClick={() => setLayers([...layers, { id: Date.now().toString(), type: 'text', content: 'New Text', x: 100, y: 100, fontSize: 60, color: '#1E252B', fontFamily: 'Inter', width: 400, height: 100, visible: true, rotation: 0 }])}
+                    onClick={() => setLayers([...layers, { id: Date.now().toString(), type: 'text', name: 'Text', content: 'New Text', x: 100, y: 100, fontSize: 60, color: '#1E252B', fontFamily: 'Inter', width: 400, height: 100, visible: true, rotation: 0 }])}
                   >
                     <Type size={20} style={{ color: 'var(--accent-color)', marginBottom: '6px' }} />
                     <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Text</span>
@@ -1876,7 +1910,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '12px 8px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', shape: 'square', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', name: 'Square', shape: 'square', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -1889,7 +1923,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '12px 8px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', shape: 'circle', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', name: 'Circle', shape: 'circle', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -1902,7 +1936,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '12px 8px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', shape: 'triangle', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', name: 'Triangle', shape: 'triangle', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -1917,7 +1951,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '12px 8px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', shape: 'rounded-rectangle', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', name: 'Rounded Rectangle', shape: 'rounded-rectangle', color: '#C5A880', x: 250, y: 250, width: 200, height: 200, visible: true, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -1930,7 +1964,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '12px 8px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', shape: 'oval', color: '#C5A880', x: 250, y: 250, width: 220, height: 140, visible: true, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', name: 'Oval', shape: 'oval', color: '#C5A880', x: 250, y: 250, width: 220, height: 140, visible: true, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -1943,7 +1977,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '12px 8px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', shape: 'arch', color: '#C5A880', x: 250, y: 250, width: 200, height: 280, visible: true, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', name: 'Arch', shape: 'arch', color: '#C5A880', x: 250, y: 250, width: 200, height: 280, visible: true, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -1956,7 +1990,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '12px 8px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', shape: 'line', color: '#C5A880', x: 100, y: 300, width: 600, height: 20, visible: true, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'shape', name: 'Line Spacer', shape: 'line', color: '#C5A880', x: 100, y: 300, width: 600, height: 20, visible: true, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -1986,7 +2020,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)', border: '2px dashed var(--accent-color)', background: 'rgba(197, 168, 128, 0.05)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'circle', frameStyle: 'custom', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0, borderWidth: 2, borderColor: '#C5A880' }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Custom Frame', shape: 'circle', frameStyle: 'custom', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0, borderWidth: 2, borderColor: '#C5A880' }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2001,7 +2035,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'square', frameStyle: 'simple', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Simple Square Frame', shape: 'square', frameStyle: 'simple', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2014,7 +2048,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'circle', frameStyle: 'simple', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Simple Circle Frame', shape: 'circle', frameStyle: 'simple', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2027,7 +2061,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'square', frameStyle: 'gold', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Gold Foil Frame', shape: 'square', frameStyle: 'gold', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2040,7 +2074,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'square', frameStyle: 'mourning', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Mourning Ribbon Frame', shape: 'square', frameStyle: 'mourning', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2055,7 +2089,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'circle', frameStyle: 'rosary', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Rosary Circle Frame', shape: 'circle', frameStyle: 'rosary', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2070,7 +2104,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'square', frameStyle: 'floral', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Floral Corner Frame', shape: 'square', frameStyle: 'floral', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2086,7 +2120,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'square', frameStyle: 'silver', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Silver Frame', shape: 'square', frameStyle: 'silver', x: 200, y: 200, width: 300, height: 300, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2099,7 +2133,7 @@ function CreatorStudio() {
                     className="aspect-ratio-card" 
                     style={{ padding: '10px 6px', borderRadius: 'var(--radius-md)' }}
                     onClick={() => {
-                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', shape: 'arch', frameStyle: 'gold', x: 200, y: 200, width: 300, height: 400, visible: true, src: null, rotation: 0 }]);
+                      setLayers([...layers, { id: Date.now().toString(), type: 'image_frame', name: 'Elegant Arch Frame', shape: 'arch', frameStyle: 'gold', x: 200, y: 200, width: 300, height: 400, visible: true, src: null, rotation: 0 }]);
                       setElementSubPanel('main');
                     }}
                   >
@@ -2134,7 +2168,7 @@ function CreatorStudio() {
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => setLayers([...layers, { id: Date.now().toString(), type: 'text', content: verse, x: 140, y: 200 + idx * 20, fontSize: 50, color: '#1E252B', fontFamily: 'Inter', width: 800, height: 100, visible: true, rotation: 0 }])}
+                  onClick={() => setLayers([...layers, { id: Date.now().toString(), type: 'text', name: verse.length > 25 ? verse.substring(0, 25) + '...' : verse, content: verse, x: 140, y: 200 + idx * 20, fontSize: 50, color: '#1E252B', fontFamily: 'Inter', width: 800, height: 100, visible: true, rotation: 0 }])}
                   style={{
                     padding: '10px 12px',
                     textAlign: 'left',
@@ -2169,7 +2203,7 @@ function CreatorStudio() {
                 style={{ padding: '10px', height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                 onClick={() => {
                   const svgCross = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M 45,10 H 55 V 35 H 80 V 45 H 55 V 90 H 45 V 45 H 20 V 35 H 45 Z" fill="%231E252B"/></svg>`;
-                  setLayers([...layers, { id: Date.now().toString(), type: 'image', src: svgCross, x: 440, y: 100, width: 200, height: 200, visible: true, rotation: 0 }]);
+                  setLayers([...layers, { id: Date.now().toString(), type: 'image', name: 'Latin Cross', src: svgCross, x: 440, y: 100, width: 200, height: 200, visible: true, rotation: 0 }]);
                 }}
               >
                 <svg viewBox="0 0 100 100" width="36" height="36"><path d="M 45,10 H 55 V 35 H 80 V 45 H 55 V 90 H 45 V 45 H 20 V 35 H 45 Z" fill="var(--text-primary)" /></svg>
@@ -2183,7 +2217,7 @@ function CreatorStudio() {
                 style={{ padding: '10px', height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                 onClick={() => {
                   const svgCandle = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M 42,55 H 58 V 95 H 42 Z M 50,15 C 55,28 50,45 50,45 C 50,45 45,28 50,15 Z" fill="%23C5A880"/><path d="M 40,95 H 60" stroke="%231E252B" stroke-width="4"/></svg>`;
-                  setLayers([...layers, { id: Date.now().toString(), type: 'image', src: svgCandle, x: 440, y: 100, width: 200, height: 200, visible: true, rotation: 0 }]);
+                  setLayers([...layers, { id: Date.now().toString(), type: 'image', name: 'Memorial Candle', src: svgCandle, x: 440, y: 100, width: 200, height: 200, visible: true, rotation: 0 }]);
                 }}
               >
                 <svg viewBox="0 0 100 100" width="36" height="36"><path d="M 42,55 H 58 V 95 H 42 Z M 50,15 C 55,28 50,45 50,45 C 50,45 45,28 50,15 Z" fill="var(--accent-color)"/><path d="M 40,95 H 60" stroke="var(--text-primary)" strokeWidth="4"/></svg>
@@ -2197,7 +2231,7 @@ function CreatorStudio() {
                 style={{ padding: '10px', height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                 onClick={() => {
                   const svgDove = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M 70,30 C 50,25 35,40 30,55 C 25,60 15,55 10,65 C 20,70 30,65 35,60 C 45,55 55,60 65,55 C 75,50 80,40 70,30 Z" fill="%231E252B"/></svg>`;
-                  setLayers([...layers, { id: Date.now().toString(), type: 'image', src: svgDove, x: 440, y: 100, width: 200, height: 200, visible: true, rotation: 0 }]);
+                  setLayers([...layers, { id: Date.now().toString(), type: 'image', name: 'Peace Dove', src: svgDove, x: 440, y: 100, width: 200, height: 200, visible: true, rotation: 0 }]);
                 }}
               >
                 <svg viewBox="0 0 100 100" width="36" height="36"><path d="M 70,30 C 50,25 35,40 30,55 C 25,60 15,55 10,65 C 20,70 30,65 35,60 C 45,55 55,60 65,55 C 75,50 80,40 70,30 Z" fill="var(--text-primary)" /></svg>
@@ -2211,7 +2245,7 @@ function CreatorStudio() {
                 style={{ padding: '10px', height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                 onClick={() => {
                   const svgBorder = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none"><rect x="5" y="5" width="90" height="90" stroke="%23C5A880" stroke-width="4"/><rect x="10" y="10" width="80" height="80" stroke="%231E252B" stroke-width="1"/></svg>`;
-                  setLayers([...layers, { id: Date.now().toString(), type: 'image', src: svgBorder, x: 54, y: 54, width: 972, height: 972, visible: true, rotation: 0 }]);
+                  setLayers([...layers, { id: Date.now().toString(), type: 'image', name: 'Ornamental Border', src: svgBorder, x: 54, y: 54, width: 972, height: 972, visible: true, rotation: 0 }]);
                 }}
               >
                 <svg viewBox="0 0 100 100" width="36" height="36" fill="none"><rect x="10" y="10" width="80" height="80" stroke="var(--accent-color)" strokeWidth="4"/><rect x="20" y="20" width="60" height="60" stroke="var(--text-primary)" strokeWidth="1"/></svg>
@@ -2278,6 +2312,7 @@ function CreatorStudio() {
                     setLayers([...layers, { 
                       id: Date.now().toString(), 
                       type: 'image', 
+                      name: flower.name,
                       src: `/flowers/${flower.id}.png`, 
                       x: 100, y: 100, 
                       width: 400, height: 400, 
@@ -2305,7 +2340,7 @@ function CreatorStudio() {
                 const file = e.target.files[0];
                 const localUrl = URL.createObjectURL(file);
                 const tempId = Date.now().toString();
-                setLayers(prev => [...prev, { id: tempId, type: 'image', src: localUrl, x: 100, y: 100, width: 300, height: 300, visible: true }]);
+                setLayers(prev => [...prev, { id: tempId, type: 'image', name: 'Uploaded Photo', src: localUrl, x: 100, y: 100, width: 300, height: 300, visible: true }]);
                 
                 const serverUrl = await uploadFile(file);
                 setLayers(prev => prev.map(l => l.id === tempId ? { ...l, src: serverUrl } : l));
@@ -2327,6 +2362,18 @@ function CreatorStudio() {
           {/* Shared Layer Controls (Alignment & Rotation) */}
           {activeLayer && (
             <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '20px', marginBottom: '20px' }}>
+              {/* Layer Name Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Layer Name</label>
+                <input 
+                  type="text" 
+                  value={activeLayer.name || ''} 
+                  placeholder={getLayerDisplayName(activeLayer, layers)}
+                  onChange={(e) => updateLayer(activeLayer.id, { name: e.target.value })}
+                  style={{ width: '100%', padding: '6px 10px', fontSize: '12px', boxSizing: 'border-box' }}
+                />
+              </div>
+
               {/* Layer Alignment Utilities */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                 <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Alignment</label>
@@ -3175,6 +3222,22 @@ function CreatorStudio() {
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Corner Roundness Slider (for Square or Rounded Rectangle frames) */}
+              {(!activeLayer.shape || activeLayer.shape === 'square' || activeLayer.shape === 'rounded-rectangle') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                    <span>Corner Roundness</span>
+                    <span>{activeLayer.borderRadius !== undefined ? activeLayer.borderRadius : (activeLayer.shape === 'rounded-rectangle' ? 20 : 0)}px</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max="100" step="1"
+                    value={activeLayer.borderRadius !== undefined ? activeLayer.borderRadius : (activeLayer.shape === 'rounded-rectangle' ? 20 : 0)} 
+                    onChange={(e) => updateLayer(activeLayer.id, { borderRadius: parseInt(e.target.value) })}
+                    style={{ width: '100%', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                  />
+                </div>
               )}
             </div>
           )}
