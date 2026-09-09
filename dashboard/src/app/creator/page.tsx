@@ -1466,8 +1466,8 @@ function CreatorStudio() {
                   position={{ x: 0, y: 0 }}
                   disableDragging={true}
                   dragGrid={snapToGrid ? [10 * scale, 10 * scale] : undefined}
-                  resizeGrid={snapToGrid && (layer.type === 'shape' || layer.type === 'image_frame') ? [10 * scale, 10 * scale] : undefined}
-                  lockAspectRatio={layer.type === 'text'}
+                  resizeGrid={snapToGrid ? [10 * scale, 10 * scale] : undefined}
+                  lockAspectRatio={false}
                   onResizeStop={(e, direction, ref, delta, position) => {
                     setIsDragging(false);
                     const newWidth = ref.offsetWidth / scale;
@@ -1486,8 +1486,11 @@ function CreatorStudio() {
                     };
 
                     if (layer.type === 'text') {
-                      const scaleFactor = newWidth / layer.width;
-                      updates.fontSize = Math.round((layer.fontSize || 16) * scaleFactor);
+                      const isCorner = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'].includes(direction);
+                      if (isCorner && layer.width > 0) {
+                        const scaleFactor = newWidth / layer.width;
+                        updates.fontSize = Math.max(8, Math.round((layer.fontSize || 16) * scaleFactor));
+                      }
                       updates.height = ref.offsetHeight / scale;
                     }
 
@@ -1514,27 +1517,34 @@ function CreatorStudio() {
                   onResize={(e, direction, ref, delta, position) => {
                     if (!isDragging) setIsDragging(true);
                     if (layer.type === 'text') {
-                      const newWidth = parseFloat(ref.style.width);
-                      if (newWidth) {
-                        const scaleFactor = newWidth / (layer.width * scale);
-                        const newFontSizeCanvas = (layer.fontSize || 16) * scaleFactor;
-                        const textSpan = ref.querySelector('span');
-                        if (textSpan) {
-                          textSpan.style.fontSize = `${newFontSizeCanvas * scale}px`;
+                      const isCorner = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'].includes(direction);
+                      const textSpan = ref.querySelector('span');
+                      if (textSpan) {
+                        if (isCorner) {
+                          const currentPxWidth = ref.offsetWidth;
+                          const initialPxWidth = layer.width * scale;
+                          if (initialPxWidth > 0) {
+                            const scaleFactor = currentPxWidth / initialPxWidth;
+                            const liveFontSize = (layer.fontSize || 16) * scaleFactor * scale;
+                            textSpan.style.fontSize = `${liveFontSize}px`;
+                          }
+                        } else {
+                          // Keep font size constant when resizing from edges (left, right, top, bottom)
+                          textSpan.style.fontSize = `${(layer.fontSize || 16) * scale}px`;
                         }
                       }
                     }
                   }}
-                  enableResizing={!layer.locked && activeLayerId === layer.id ? ((layer.type === 'shape' || layer.type === 'image_frame') ? { top:true, right:true, bottom:true, left:true, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true } : { top:false, right:false, bottom:false, left:false, topRight:true, bottomRight:true, bottomLeft:true, topLeft:true }) : false}
+                  enableResizing={!layer.locked && activeLayerId === layer.id ? { top: true, right: true, bottom: true, left: true, topRight: true, bottomRight: true, bottomLeft: true, topLeft: true } : false}
                   resizeHandleStyles={activeLayerId === layer.id ? {
                     topLeft: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', left: '-5px', top: '-5px' },
                     topRight: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', right: '-5px', top: '-5px' },
                     bottomLeft: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', left: '-5px', bottom: '-5px' },
                     bottomRight: { width: '10px', height: '10px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '50%', right: '-5px', bottom: '-5px' },
-                    top: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', top: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } : undefined,
-                    bottom: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', bottom: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } : undefined,
-                    left: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', left: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
-                    right: (layer.type === 'shape' || layer.type === 'image_frame') ? { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', right: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' } : undefined,
+                    top: { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', top: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' },
+                    bottom: { width: '20px', height: '6px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', bottom: '-3px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' },
+                    left: { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', left: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' },
+                    right: { width: '6px', height: '20px', background: 'white', border: '2px solid var(--accent-color)', borderRadius: '3px', right: '-3px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' },
                   } : undefined}
                   onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
