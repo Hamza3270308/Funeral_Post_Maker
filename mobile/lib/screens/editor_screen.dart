@@ -20,6 +20,7 @@ import 'export_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/user_settings_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 enum SelectedElementType {
   none,
   photo,
@@ -1124,17 +1125,30 @@ class _EditorScreenState extends State<EditorScreen> {
       imageWidget = Image.asset(
         resolvedUrl,
         fit: BoxFit.fill,
-        color: layer.mixBlendMode == 'multiply' ? Colors.black.withOpacity(0.0) : null,
-        colorBlendMode: layer.mixBlendMode == 'multiply' ? BlendMode.multiply : null,
         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       );
+    } else if (resolvedUrl.contains('/flowers/')) {
+      final flowerFileName = resolvedUrl.split('/flowers/').last.split('?').first;
+      imageWidget = Image.asset(
+        'assets/flowers/$flowerFileName',
+        fit: BoxFit.fill,
+        errorBuilder: (_, __, ___) => CachedNetworkImage(
+          imageUrl: resolvedUrl,
+          fit: BoxFit.fill,
+          placeholder: (_, __) => const Center(
+            child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+          ),
+          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        ),
+      );
     } else if (resolvedUrl.startsWith('http')) {
-      imageWidget = Image.network(
-        resolvedUrl,
+      imageWidget = CachedNetworkImage(
+        imageUrl: resolvedUrl,
         fit: BoxFit.fill, // Match web dashboard's objectFit: 'fill' to preserve layout
-        color: layer.mixBlendMode == 'multiply' ? Colors.black.withOpacity(0.0) : null,
-        colorBlendMode: layer.mixBlendMode == 'multiply' ? BlendMode.multiply : null,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        placeholder: (_, __) => const Center(
+          child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        errorWidget: (_, __, ___) => const SizedBox.shrink(),
       );
     } else {
       imageWidget = const SizedBox.shrink();
@@ -1818,23 +1832,31 @@ class _EditorScreenState extends State<EditorScreen> {
 
       Widget overlayChild;
       if (item.graphic.isImageOverlay) {
-        // Real PNG floral image from backend
+        // Real PNG floral image from backend (with local assets bundle for 0ms loading)
         final imageUrl = '${ApiService.baseUrl}/flowers/${item.graphic.imageFile}';
         final imgW = w * 0.9 * item.scale;
         overlayChild = SizedBox(
           width: imgW,
-          // Removed height: imgH to allow the bounding box to shrink-wrap the image aspect ratio
           child: Opacity(
             opacity: item.opacity,
             child: Transform.scale(
               scaleX: item.flipHorizontal ? -1.0 : 1.0,
               scaleY: item.flipVertical ? -1.0 : 1.0,
-              child: Image.network(
-                imageUrl,
+              child: Image.asset(
+                'assets/flowers/${item.graphic.imageFile}',
                 fit: BoxFit.contain,
-                color: Colors.black.withOpacity(0.0), // transparent tint
-                colorBlendMode: BlendMode.multiply,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                errorBuilder: (_, __, ___) => CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.contain,
+                  placeholder: (_, __) => const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
@@ -2246,12 +2268,23 @@ class _EditorScreenState extends State<EditorScreen> {
                     ),
                   ),
                 ),
-                // Actual floral image from backend
-                Image.network(
-                  imageUrl,
+                // Floral image: Load from bundled local assets first (0ms), fallback to CachedNetworkImage
+                Image.asset(
+                  'assets/flowers/${g.imageFile}',
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Center(
-                    child: Icon(Icons.local_florist_rounded, size: 40, color: Color(0xFF94A3B8)),
+                  errorBuilder: (_, __, ___) => CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (_, __, ___) => const Center(
+                      child: Icon(Icons.local_florist_rounded, size: 36, color: Color(0xFF94A3B8)),
+                    ),
                   ),
                 ),
                 // Label at the bottom

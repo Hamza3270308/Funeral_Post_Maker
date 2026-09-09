@@ -3,6 +3,7 @@ import '../models/template.dart';
 import '../services/api_service.dart';
 import '../theme/theme.dart';
 import 'editor_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SavedDesignsScreen extends StatefulWidget {
   const SavedDesignsScreen({super.key});
@@ -328,10 +329,11 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
           errorBuilder: (_, __, ___) => Container(color: Colors.white),
         );
       } else {
-        backgroundWidget = Image.network(
-          resolvedUrl,
+        backgroundWidget = CachedNetworkImage(
+          imageUrl: resolvedUrl,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(color: Colors.white),
+          placeholder: (_, __) => Container(color: Colors.grey[200]),
+          errorWidget: (_, __, ___) => Container(color: Colors.white),
         );
       }
     } else if (bg.type == 'color' && bg.value.startsWith('#')) {
@@ -385,8 +387,29 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
               Widget imgWidget;
               if (resolvedUrl.startsWith('assets/')) {
                 imgWidget = Image.asset(resolvedUrl, fit: BoxFit.fill, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+              } else if (resolvedUrl.contains('/flowers/')) {
+                final flowerFileName = resolvedUrl.split('/flowers/').last.split('?').first;
+                imgWidget = Image.asset(
+                  'assets/flowers/$flowerFileName',
+                  fit: BoxFit.fill,
+                  errorBuilder: (_, __, ___) => CachedNetworkImage(
+                    imageUrl: resolvedUrl,
+                    fit: BoxFit.fill,
+                    placeholder: (_, __) => const Center(
+                      child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                );
               } else if (resolvedUrl.startsWith('http')) {
-                imgWidget = Image.network(resolvedUrl, fit: BoxFit.fill, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+                imgWidget = CachedNetworkImage(
+                  imageUrl: resolvedUrl,
+                  fit: BoxFit.fill,
+                  placeholder: (_, __) => const Center(
+                    child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                );
               } else {
                 return const SizedBox.shrink();
               }

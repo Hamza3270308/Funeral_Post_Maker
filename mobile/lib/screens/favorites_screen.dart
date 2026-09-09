@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/user_settings_service.dart';
 import '../theme/theme.dart';
 import 'editor_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -191,7 +192,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 children: [
                   Positioned.fill(
                     child: isImageBg
-                      ? Image.network(ApiService.resolveImageUrl(bgValue), fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: Colors.grey[200]))
+                      ? CachedNetworkImage(
+                          imageUrl: ApiService.resolveImageUrl(bgValue),
+                          fit: BoxFit.cover,
+                          placeholder: (c, u) => Container(color: Colors.grey[200]),
+                          errorWidget: (c, e, s) => Container(color: Colors.grey[200]),
+                        )
                       : Container(color: _parseColor(bgValue)),
                   ),
                   Positioned(

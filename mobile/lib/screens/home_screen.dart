@@ -8,6 +8,7 @@ import 'profile_screen.dart';
 import 'settings_screen.dart';
 import '../services/user_settings_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -421,10 +422,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: isImageBg ? Colors.white : _parseHexColor(bgValue),
                         ),
                         child: isImageBg && bgValue.startsWith('http')
-                            ? Image.network(
-                                _resolveImageUrl(bgValue),
+                            ? CachedNetworkImage(
+                                imageUrl: _resolveImageUrl(bgValue),
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
+                                placeholder: (context, url) => Container(
+                                  color: const Color(0xFFF1F5F9),
+                                  child: const Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, error, stackTrace) {
                                   return const Center(
                                     child: Icon(
                                       Icons.broken_image_rounded,
