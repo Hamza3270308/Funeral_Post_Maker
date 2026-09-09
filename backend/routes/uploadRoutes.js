@@ -1,46 +1,65 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const sharp = require("sharp");
 
 // Ensure uploads directory exists
-const uploadDir = path.join(__dirname, '../uploads');
+const uploadDir = path.join(__dirname, "../uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer config
-const storage = multer.diskStorage({
-  destination(req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename(req, file, cb) {
-    // Keep original extension and avoid naming collisions
-    const ext = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, ext);
-    cb(null, `${basename}-${Date.now()}${ext}`);
-  }
-});
-
+// Multer memory storage
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
 });
 
-// @desc    Upload an asset (background, image, etc.)
+// @desc    Upload & compress an asset (background, image, etc.)
 // @route   POST /api/upload
-router.post('/', upload.single('file'), (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
+    return res.status(400).json({ message: "No file uploaded" });
   }
-  
-  // Return the path so the frontend can save it to the template schema
-  const filePath = `/uploads/${req.file.filename}`;
-  res.status(201).json({
-    message: 'File uploaded successfully',
-    url: filePath
-  });
+
+  try {
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const rawBasename = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const timestamp = Date.now();
+    const filename = `${rawBasename}-${timestamp}.webp`;
+    const outputPath = path.join(uploadDir, filename);
+
+    if (req.file.mimetype.startsWith("image/")) {
+      await sharp(req.file.buffer)
+        .rotate()
+        .resize(1920, 1920, {
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 82, effort: 4 })
+        .toFile(outputPath);
+    } else {
+      const fallbackFilename = `${rawBasename}-${timestamp}${ext}`;
+      const fallbackPath = path.join(uploadDir, fallbackFilename);
+      fs.writeFileSync(fallbackPath, req.file.buffer);
+      return res.status(201).json({
+        message: "File uploaded successfully",
+        url: `/uploads/${fallbackFilename}`
+      });
+    }
+
+    const filePath = `/uploads/${filename}`;
+    res.status(201).json({
+      message: "File uploaded and compressed successfully",
+      url: filePath
+    });
+  } catch (err) {
+    console.error("Image compression error:", err);
+    res.status(500).json({ message: "Error processing image upload", error: err.message });
+  }
 });
 
 module.exports = router;
