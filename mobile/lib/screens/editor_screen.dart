@@ -1208,20 +1208,23 @@ class _EditorScreenState extends State<EditorScreen> {
       onScaleEnd: (details) {
         _handleScaleEnd(layer, details);
       },
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: isSelected
-            ? BoxDecoration(
+      child: isSelected
+          ? Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
                 border: Border.all(color: _limeAccent, width: 2.5),
                 borderRadius: BorderRadius.circular(8),
                 color: _limeAccent.withOpacity(0.12),
-              )
-            : null,
-        child: Opacity(
-          opacity: layer.opacity.clamp(0.0, 1.0),
-          child: imageWidget,
-        ),
-      ),
+              ),
+              child: Opacity(
+                opacity: layer.opacity.clamp(0.0, 1.0),
+                child: imageWidget,
+              ),
+            )
+          : Opacity(
+              opacity: layer.opacity.clamp(0.0, 1.0),
+              child: imageWidget,
+            ),
     );
 
     if (layer.rotation != 0) {
@@ -1975,14 +1978,15 @@ class _EditorScreenState extends State<EditorScreen> {
             ? Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: _limeAccent, width: 2.5),
-                      borderRadius: BorderRadius.circular(8),
-                      color: _limeAccent.withOpacity(0.12),
+                  overlayChild,
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: _limeAccent, width: 2.5),
+                        borderRadius: BorderRadius.circular(8),
+                        color: _limeAccent.withOpacity(0.12),
+                      ),
                     ),
-                    child: overlayChild,
                   ),
                   _buildCornerResizeHandle(
                     alignment: Alignment.topLeft,
@@ -2022,10 +2026,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   ),
                 ],
               )
-            : Container(
-                padding: const EdgeInsets.all(4),
-                child: overlayChild,
-              ),
+            : overlayChild,
       );
 
       if (item.rotation != 0) {
