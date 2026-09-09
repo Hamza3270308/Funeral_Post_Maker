@@ -476,6 +476,8 @@ class ShapeLayer {
   double width;
   double height;
   double opacity;
+  double rotation;
+  double? borderRadius;
   final double borderWidth;
   final String borderColor;
   int zIndex;
@@ -492,6 +494,8 @@ class ShapeLayer {
     required this.width,
     required this.height,
     required this.opacity,
+    this.rotation = 0.0,
+    this.borderRadius,
     required this.borderWidth,
     required this.borderColor,
     this.zIndex = 0,
@@ -510,6 +514,8 @@ class ShapeLayer {
       width: (json['width'] ?? 100).toDouble(),
       height: (json['height'] ?? 100).toDouble(),
       opacity: (json['opacity'] ?? 1.0).toDouble(),
+      rotation: (json['rotation'] ?? 0.0).toDouble(),
+      borderRadius: json['borderRadius'] != null ? (json['borderRadius'] as num).toDouble() : null,
       borderWidth: (json['borderWidth'] ?? 0).toDouble(),
       borderColor: json['borderColor'] ?? '#000000',
       zIndex: json['zIndex'] ?? 0,
@@ -529,6 +535,8 @@ class ShapeLayer {
       'width': width,
       'height': height,
       'opacity': opacity,
+      'rotation': rotation,
+      if (borderRadius != null) 'borderRadius': borderRadius,
       'borderWidth': borderWidth,
       'borderColor': borderColor,
       'zIndex': zIndex,
@@ -545,6 +553,8 @@ class ShapeLayer {
     double? width,
     double? height,
     double? opacity,
+    double? rotation,
+    double? borderRadius,
     int? zIndex,
     bool? hidden,
     bool? locked,
@@ -559,6 +569,8 @@ class ShapeLayer {
       width: width ?? this.width,
       height: height ?? this.height,
       opacity: opacity ?? this.opacity,
+      rotation: rotation ?? this.rotation,
+      borderRadius: borderRadius ?? this.borderRadius,
       borderWidth: this.borderWidth,
       borderColor: this.borderColor,
       zIndex: zIndex ?? this.zIndex,

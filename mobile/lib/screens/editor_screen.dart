@@ -1187,50 +1187,57 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final isSelected = _selectedType == SelectedElementType.templateImage && _selectedOverlayId == layer.id && !layer.locked;
 
+    Widget interactiveChild = GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_selectedType == SelectedElementType.templateImage && _selectedOverlayId == layer.id) {
+            _selectedType = SelectedElementType.none;
+            _selectedOverlayId = null;
+          } else {
+            _selectedType = SelectedElementType.templateImage;
+            _selectedOverlayId = layer.id;
+          }
+        });
+      },
+      onScaleStart: (details) {
+        _handleScaleStart(layer, details);
+      },
+      onScaleUpdate: (details) {
+        _handleScaleUpdate(layer, details, w, h);
+      },
+      onScaleEnd: (details) {
+        _handleScaleEnd(layer, details);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: isSelected
+            ? BoxDecoration(
+                border: Border.all(color: _limeAccent, width: 2.5),
+                borderRadius: BorderRadius.circular(8),
+                color: _limeAccent.withOpacity(0.12),
+              )
+            : null,
+        child: Opacity(
+          opacity: layer.opacity.clamp(0.0, 1.0),
+          child: imageWidget,
+        ),
+      ),
+    );
+
+    if (layer.rotation != 0) {
+      interactiveChild = Transform(
+        alignment: Alignment.topLeft,
+        transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
+        child: interactiveChild,
+      );
+    }
+
     return Positioned(
       left: layer.x * w,
       top: layer.y * h,
       width: layer.width * w,
       height: layer.height * h,
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            if (_selectedType == SelectedElementType.templateImage && _selectedOverlayId == layer.id) {
-              _selectedType = SelectedElementType.none;
-              _selectedOverlayId = null;
-            } else {
-              _selectedType = SelectedElementType.templateImage;
-              _selectedOverlayId = layer.id;
-            }
-          });
-        },
-        onScaleStart: (details) {
-          _handleScaleStart(layer, details);
-        },
-        onScaleUpdate: (details) {
-          _handleScaleUpdate(layer, details, w, h);
-        },
-        onScaleEnd: (details) {
-          _handleScaleEnd(layer, details);
-        },
-        child: Container(
-          padding: const EdgeInsets.all(4),
-          decoration: isSelected
-              ? BoxDecoration(
-                  border: Border.all(color: _limeAccent, width: 2.5),
-                  borderRadius: BorderRadius.circular(8),
-                  color: _limeAccent.withOpacity(0.12),
-                )
-              : null,
-          child: Opacity(
-            opacity: layer.opacity.clamp(0.0, 1.0),
-            child: Transform.rotate(
-              angle: layer.rotation * (3.14159 / 180),
-              child: imageWidget,
-            ),
-          ),
-        ),
-      ),
+      child: interactiveChild,
     );
   }
 
@@ -1260,47 +1267,57 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final isSelected = _selectedType == SelectedElementType.shape && _selectedOverlayId == layer.id && !layer.locked;
 
+    Widget interactiveChild = GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_selectedType == SelectedElementType.shape && _selectedOverlayId == layer.id) {
+            _selectedType = SelectedElementType.none;
+            _selectedOverlayId = null;
+          } else {
+            _selectedType = SelectedElementType.shape;
+            _selectedOverlayId = layer.id;
+          }
+        });
+      },
+      onScaleStart: (details) {
+        _handleScaleStart(layer, details);
+      },
+      onScaleUpdate: (details) {
+        _handleScaleUpdate(layer, details, w, h);
+      },
+      onScaleEnd: (details) {
+        _handleScaleEnd(layer, details);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: isSelected
+            ? BoxDecoration(
+                border: Border.all(color: _limeAccent, width: 2.5),
+                borderRadius: BorderRadius.circular(8),
+                color: _limeAccent.withOpacity(0.12),
+              )
+            : null,
+        child: Opacity(
+          opacity: layer.opacity.clamp(0.0, 1.0),
+          child: Container(decoration: decoration),
+        ),
+      ),
+    );
+
+    if (layer.rotation != 0) {
+      interactiveChild = Transform(
+        alignment: Alignment.topLeft,
+        transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
+        child: interactiveChild,
+      );
+    }
+
     return Positioned(
       left: layer.x * w,
       top: layer.y * h,
       width: layer.width * w,
       height: layer.height * h,
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            if (_selectedType == SelectedElementType.shape && _selectedOverlayId == layer.id) {
-              _selectedType = SelectedElementType.none;
-              _selectedOverlayId = null;
-            } else {
-              _selectedType = SelectedElementType.shape;
-              _selectedOverlayId = layer.id;
-            }
-          });
-        },
-        onScaleStart: (details) {
-          _handleScaleStart(layer, details);
-        },
-        onScaleUpdate: (details) {
-          _handleScaleUpdate(layer, details, w, h);
-        },
-        onScaleEnd: (details) {
-          _handleScaleEnd(layer, details);
-        },
-        child: Container(
-          padding: const EdgeInsets.all(4),
-          decoration: isSelected
-              ? BoxDecoration(
-                  border: Border.all(color: _limeAccent, width: 2.5),
-                  borderRadius: BorderRadius.circular(8),
-                  color: _limeAccent.withOpacity(0.12),
-                )
-              : null,
-          child: Opacity(
-            opacity: layer.opacity.clamp(0.0, 1.0),
-            child: Container(decoration: decoration),
-          ),
-        ),
-      ),
+      child: interactiveChild,
     );
   }
 
@@ -1494,110 +1511,120 @@ class _EditorScreenState extends State<EditorScreen> {
                 ? SelectedElementType.dates
                 : SelectedElementType.tribute;
 
+    Widget interactiveChild = GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_activeTextLayer?.id == layer.id) {
+            _activeTextLayer = null;
+            _selectedType = SelectedElementType.none;
+            _activeTray = ActiveTrayType.none;
+          } else {
+            _activeTextLayer = layer;
+            _selectedType = elementType;
+            _selectedOverlayId = null;
+            _openIntegratedTextTrayFor(elementType);
+          }
+        });
+      },
+      onScaleStart: (details) {
+        _handleScaleStart(layer, details);
+      },
+      onScaleUpdate: (details) {
+        _handleScaleUpdate(layer, details, w, h);
+      },
+      onScaleEnd: (details) {
+        _handleScaleEnd(layer, details);
+      },
+      // Only apply selection decoration when selected
+      child: isSelected
+          ? Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  left: -12,
+                  top: -6,
+                  right: -12,
+                  bottom: -6,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: _limeAccent, width: 2.5),
+                      borderRadius: BorderRadius.circular(6),
+                      color: _limeAccent.withOpacity(0.18),
+                    ),
+                  ),
+                ),
+                innerChild,
+                _buildCornerResizeHandle(
+                  alignment: Alignment.topLeft,
+                  onPanUpdate: (details) {
+                    final dx = details.delta.dx / w;
+                    setState(() {
+                      final oldRight = layer.x + layer.width;
+                      layer.width -= dx;
+                      if (layer.width < 0.1) {
+                        layer.width = 0.1;
+                        layer.x = oldRight - 0.1;
+                      } else {
+                        layer.x += dx;
+                      }
+                    });
+                  },
+                ),
+                _buildCornerResizeHandle(
+                  alignment: Alignment.topRight,
+                  onPanUpdate: (details) {
+                    final dx = details.delta.dx / w;
+                    setState(() {
+                      layer.width += dx;
+                      if (layer.width < 0.1) layer.width = 0.1;
+                    });
+                  },
+                ),
+                _buildCornerResizeHandle(
+                  alignment: Alignment.bottomLeft,
+                  onPanUpdate: (details) {
+                    final dx = details.delta.dx / w;
+                    setState(() {
+                      final oldRight = layer.x + layer.width;
+                      layer.width -= dx;
+                      if (layer.width < 0.1) {
+                        layer.width = 0.1;
+                        layer.x = oldRight - 0.1;
+                      } else {
+                        layer.x += dx;
+                      }
+                    });
+                  },
+                ),
+                _buildCornerResizeHandle(
+                  alignment: Alignment.bottomRight,
+                  onPanUpdate: (details) {
+                    final dx = details.delta.dx / w;
+                    setState(() {
+                      layer.width += dx;
+                      if (layer.width < 0.1) layer.width = 0.1;
+                    });
+                  },
+                ),
+              ],
+            )
+          : innerChild,
+    );
+
+    if (layer.rotation != 0) {
+      interactiveChild = Transform(
+        alignment: Alignment.topLeft,
+        transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
+        child: interactiveChild,
+      );
+    }
+
     return Positioned(
       left: layer.x * w,
       top: layer.y * h,
       width: layer.width * w,
       // No fixed height — web uses overflow:visible; canvas Clip.hardEdge handles boundary
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            if (_activeTextLayer?.id == layer.id) {
-              _activeTextLayer = null;
-              _selectedType = SelectedElementType.none;
-              _activeTray = ActiveTrayType.none;
-            } else {
-              _activeTextLayer = layer;
-              _selectedType = elementType;
-              _selectedOverlayId = null;
-              _openIntegratedTextTrayFor(elementType);
-            }
-          });
-        },
-        onScaleStart: (details) {
-          _handleScaleStart(layer, details);
-        },
-        onScaleUpdate: (details) {
-          _handleScaleUpdate(layer, details, w, h);
-        },
-        onScaleEnd: (details) {
-          _handleScaleEnd(layer, details);
-        },
-        // Only apply selection decoration when selected
-        child: isSelected
-            ? Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    left: -12,
-                    top: -6,
-                    right: -12,
-                    bottom: -6,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: _limeAccent, width: 2.5),
-                        borderRadius: BorderRadius.circular(6),
-                        color: _limeAccent.withOpacity(0.18),
-                      ),
-                    ),
-                  ),
-                  innerChild,
-                  _buildCornerResizeHandle(
-                    alignment: Alignment.topLeft,
-                    onPanUpdate: (details) {
-                      final dx = details.delta.dx / w;
-                      setState(() {
-                        final oldRight = layer.x + layer.width;
-                        layer.width -= dx;
-                        if (layer.width < 0.1) {
-                          layer.width = 0.1;
-                          layer.x = oldRight - 0.1;
-                        } else {
-                          layer.x += dx;
-                        }
-                      });
-                    },
-                  ),
-                  _buildCornerResizeHandle(
-                    alignment: Alignment.topRight,
-                    onPanUpdate: (details) {
-                      final dx = details.delta.dx / w;
-                      setState(() {
-                        layer.width += dx;
-                        if (layer.width < 0.1) layer.width = 0.1;
-                      });
-                    },
-                  ),
-                  _buildCornerResizeHandle(
-                    alignment: Alignment.bottomLeft,
-                    onPanUpdate: (details) {
-                      final dx = details.delta.dx / w;
-                      setState(() {
-                        final oldRight = layer.x + layer.width;
-                        layer.width -= dx;
-                        if (layer.width < 0.1) {
-                          layer.width = 0.1;
-                          layer.x = oldRight - 0.1;
-                        } else {
-                          layer.x += dx;
-                        }
-                      });
-                    },
-                  ),
-                  _buildCornerResizeHandle(
-                    alignment: Alignment.bottomRight,
-                    onPanUpdate: (details) {
-                      final dx = details.delta.dx / w;
-                      setState(() {
-                        layer.width += dx;
-                        if (layer.width < 0.1) layer.width = 0.1;
-                      });
-                    },
-                  ),
-                ],
-              )
-            : innerChild,
-      ),
+      child: interactiveChild,
     );
   }
 
@@ -1646,149 +1673,159 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
     );
 
+    Widget interactiveChild = GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_selectedType == SelectedElementType.photo) {
+            _selectedType = SelectedElementType.none;
+            _selectedOverlayId = null;
+            _activeTray = ActiveTrayType.none;
+          } else {
+            _selectedType = SelectedElementType.photo;
+            _selectedOverlayId = null;
+            _activeTray = ActiveTrayType.photo;
+          }
+        });
+      },
+      onScaleStart: (details) {
+        _handleScaleStart(layer, details);
+      },
+      onScaleUpdate: (details) {
+        _handleScaleUpdate(layer, details, w, h);
+      },
+      onScaleEnd: (details) {
+        _handleScaleEnd(layer, details);
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: layer.width * w,
+            height: layer.height * h,
+            // FIX #5: No hardcoded padding — it shrinks the clip area and creates a ring
+            decoration: isSelected
+                ? BoxDecoration(
+                    border: Border.all(color: _limeAccent, width: 3),
+                    shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+                    borderRadius: isCircle ? null : getRadius(),
+                    color: _limeAccent.withOpacity(0.18),
+                  )
+                : BoxDecoration(
+                    shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+                    borderRadius: isCircle ? null : getRadius(),
+                    border: Border.all(color: Colors.transparent, width: 0),
+                  ),
+            child: clipContent,
+          ),
+          // Item 8: Custom Uploaded Frame Border Overlay
+          if (effectiveShapeIndex == 5 && _customFrameImagePath != null)
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: getRadius(),
+                child: Image.file(
+                  File(_customFrameImagePath!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          if (isSelected) ...[
+            _buildCornerResizeHandle(
+              alignment: Alignment.topLeft,
+              onPanUpdate: (details) {
+                final dx = details.delta.dx / w;
+                final dy = details.delta.dy / h;
+                setState(() {
+                  final oldRight = layer.x + layer.width;
+                  final oldBottom = layer.y + layer.height;
+                  layer.width -= dx;
+                  layer.height -= dy;
+                  if (layer.width < 0.1) {
+                    layer.width = 0.1;
+                    layer.x = oldRight - 0.1;
+                  } else {
+                    layer.x += dx;
+                  }
+                  if (layer.height < 0.1) {
+                    layer.height = 0.1;
+                    layer.y = oldBottom - 0.1;
+                  } else {
+                    layer.y += dy;
+                  }
+                });
+              },
+            ),
+            _buildCornerResizeHandle(
+              alignment: Alignment.topRight,
+              onPanUpdate: (details) {
+                final dx = details.delta.dx / w;
+                final dy = details.delta.dy / h;
+                setState(() {
+                  final oldBottom = layer.y + layer.height;
+                  layer.width += dx;
+                  layer.height -= dy;
+                  if (layer.width < 0.1) layer.width = 0.1;
+                  if (layer.height < 0.1) {
+                    layer.height = 0.1;
+                    layer.y = oldBottom - 0.1;
+                  } else {
+                    layer.y += dy;
+                  }
+                });
+              },
+            ),
+            _buildCornerResizeHandle(
+              alignment: Alignment.bottomLeft,
+              onPanUpdate: (details) {
+                final dx = details.delta.dx / w;
+                final dy = details.delta.dy / h;
+                setState(() {
+                  final oldRight = layer.x + layer.width;
+                  layer.width -= dx;
+                  layer.height += dy;
+                  if (layer.height < 0.1) layer.height = 0.1;
+                  if (layer.width < 0.1) {
+                    layer.width = 0.1;
+                    layer.x = oldRight - 0.1;
+                  } else {
+                    layer.x += dx;
+                  }
+                });
+              },
+            ),
+            _buildCornerResizeHandle(
+              alignment: Alignment.bottomRight,
+              onPanUpdate: (details) {
+                final dx = details.delta.dx / w;
+                final dy = details.delta.dy / h;
+                setState(() {
+                  layer.width += dx;
+                  layer.height += dy;
+                  if (layer.width < 0.1) layer.width = 0.1;
+                  if (layer.height < 0.1) layer.height = 0.1;
+                });
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (layer.rotation != 0) {
+      interactiveChild = Transform(
+        alignment: Alignment.topLeft,
+        transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
+        child: interactiveChild,
+      );
+    }
+
     return Positioned(
       left: layer.x * w,
       top: layer.y * h,
       width: layer.width * w,
       height: layer.height * h,
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            if (_selectedType == SelectedElementType.photo) {
-              _selectedType = SelectedElementType.none;
-              _selectedOverlayId = null;
-              _activeTray = ActiveTrayType.none;
-            } else {
-              _selectedType = SelectedElementType.photo;
-              _selectedOverlayId = null;
-              _activeTray = ActiveTrayType.photo;
-            }
-          });
-        },
-        onScaleStart: (details) {
-          _handleScaleStart(layer, details);
-        },
-        onScaleUpdate: (details) {
-          _handleScaleUpdate(layer, details, w, h);
-        },
-        onScaleEnd: (details) {
-          _handleScaleEnd(layer, details);
-        },
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: layer.width * w,
-              height: layer.height * h,
-              // FIX #5: No hardcoded padding — it shrinks the clip area and creates a ring
-              decoration: isSelected
-                  ? BoxDecoration(
-                      border: Border.all(color: _limeAccent, width: 3),
-                      shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-                      borderRadius: isCircle ? null : getRadius(),
-                      color: _limeAccent.withOpacity(0.18),
-                    )
-                  : BoxDecoration(
-                      shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-                      borderRadius: isCircle ? null : getRadius(),
-                      border: Border.all(color: Colors.transparent, width: 0),
-                    ),
-              child: clipContent,
-            ),
-            // Item 8: Custom Uploaded Frame Border Overlay
-            if (effectiveShapeIndex == 5 && _customFrameImagePath != null)
-              Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: getRadius(),
-                  child: Image.file(
-                    File(_customFrameImagePath!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            if (isSelected) ...[
-              _buildCornerResizeHandle(
-                alignment: Alignment.topLeft,
-                onPanUpdate: (details) {
-                  final dx = details.delta.dx / w;
-                  final dy = details.delta.dy / h;
-                  setState(() {
-                    final oldRight = layer.x + layer.width;
-                    final oldBottom = layer.y + layer.height;
-                    layer.width -= dx;
-                    layer.height -= dy;
-                    if (layer.width < 0.1) {
-                      layer.width = 0.1;
-                      layer.x = oldRight - 0.1;
-                    } else {
-                      layer.x += dx;
-                    }
-                    if (layer.height < 0.1) {
-                      layer.height = 0.1;
-                      layer.y = oldBottom - 0.1;
-                    } else {
-                      layer.y += dy;
-                    }
-                  });
-                },
-              ),
-              _buildCornerResizeHandle(
-                alignment: Alignment.topRight,
-                onPanUpdate: (details) {
-                  final dx = details.delta.dx / w;
-                  final dy = details.delta.dy / h;
-                  setState(() {
-                    final oldBottom = layer.y + layer.height;
-                    layer.width += dx;
-                    layer.height -= dy;
-                    if (layer.width < 0.1) layer.width = 0.1;
-                    if (layer.height < 0.1) {
-                      layer.height = 0.1;
-                      layer.y = oldBottom - 0.1;
-                    } else {
-                      layer.y += dy;
-                    }
-                  });
-                },
-              ),
-              _buildCornerResizeHandle(
-                alignment: Alignment.bottomLeft,
-                onPanUpdate: (details) {
-                  final dx = details.delta.dx / w;
-                  final dy = details.delta.dy / h;
-                  setState(() {
-                    final oldRight = layer.x + layer.width;
-                    layer.width -= dx;
-                    layer.height += dy;
-                    if (layer.height < 0.1) layer.height = 0.1;
-                    if (layer.width < 0.1) {
-                      layer.width = 0.1;
-                      layer.x = oldRight - 0.1;
-                    } else {
-                      layer.x += dx;
-                    }
-                  });
-                },
-              ),
-              _buildCornerResizeHandle(
-                alignment: Alignment.bottomRight,
-                onPanUpdate: (details) {
-                  final dx = details.delta.dx / w;
-                  final dy = details.delta.dy / h;
-                  setState(() {
-                    layer.width += dx;
-                    layer.height += dy;
-                    if (layer.width < 0.1) layer.width = 0.1;
-                    if (layer.height < 0.1) layer.height = 0.1;
-                  });
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
+      child: interactiveChild,
     );
   }
 
@@ -1909,25 +1946,22 @@ class _EditorScreenState extends State<EditorScreen> {
         );
       }
 
-      return Positioned(
-        left: item.position.dx,
-        top: item.position.dy,
-        child: GestureDetector(
-          onTap: () {
-            setState(() {
-              if (_selectedType == SelectedElementType.overlay && _selectedOverlayId == item.id) {
-                _selectedType = SelectedElementType.none;
-                _selectedOverlayId = null;
-                _activeTray = ActiveTrayType.none;
-              } else {
-                _selectedType = SelectedElementType.overlay;
-                _selectedOverlayId = item.id;
-                if (!item.graphic.isImageOverlay) {
-                  _activeTray = ActiveTrayType.colors;
-                }
+      Widget interactiveChild = GestureDetector(
+        onTap: () {
+          setState(() {
+            if (_selectedType == SelectedElementType.overlay && _selectedOverlayId == item.id) {
+              _selectedType = SelectedElementType.none;
+              _selectedOverlayId = null;
+              _activeTray = ActiveTrayType.none;
+            } else {
+              _selectedType = SelectedElementType.overlay;
+              _selectedOverlayId = item.id;
+              if (!item.graphic.isImageOverlay) {
+                _activeTray = ActiveTrayType.colors;
               }
-            });
-          },
+            }
+          });
+        },
         onScaleStart: (details) {
           _handleScaleStart(item, details);
         },
@@ -1988,11 +2022,24 @@ class _EditorScreenState extends State<EditorScreen> {
                   ),
                 ],
               )
-              : Container(
-                  padding: const EdgeInsets.all(4),
-                  child: overlayChild,
-                ),
-        ),
+            : Container(
+                padding: const EdgeInsets.all(4),
+                child: overlayChild,
+              ),
+      );
+
+      if (item.rotation != 0) {
+        interactiveChild = Transform(
+          alignment: Alignment.topLeft,
+          transform: Matrix4.rotationZ(item.rotation * (pi / 180.0)),
+          child: interactiveChild,
+        );
+      }
+
+      return Positioned(
+        left: item.position.dx,
+        top: item.position.dy,
+        child: interactiveChild,
       );
     }
 

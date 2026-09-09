@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/template.dart';
 import '../services/api_service.dart';
@@ -370,15 +371,23 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
               } catch (_) {
                 fillColor = const Color(0xFF888888);
               }
+              Widget shapeWidget = Opacity(
+                opacity: layer.opacity.clamp(0.0, 1.0),
+                child: Container(color: fillColor),
+              );
+              if (layer.rotation != 0) {
+                shapeWidget = Transform(
+                  alignment: Alignment.topLeft,
+                  transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
+                  child: shapeWidget,
+                );
+              }
               return Positioned(
                 left: layer.x * w,
                 top: layer.y * h,
                 width: layer.width * w,
                 height: layer.height * h,
-                child: Opacity(
-                  opacity: layer.opacity.clamp(0.0, 1.0),
-                  child: Container(color: fillColor),
-                ),
+                child: shapeWidget,
               );
             }),
             // Render sticker image layers (non-frame)
@@ -414,15 +423,23 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
                 return const SizedBox.shrink();
               }
               
+              Widget stickerWidget = Opacity(
+                opacity: layer.opacity.clamp(0.0, 1.0),
+                child: imgWidget,
+              );
+              if (layer.rotation != 0) {
+                stickerWidget = Transform(
+                  alignment: Alignment.topLeft,
+                  transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
+                  child: stickerWidget,
+                );
+              }
               return Positioned(
                 left: layer.x * w,
                 top: layer.y * h,
                 width: layer.width * w,
                 height: layer.height * h,
-                child: Opacity(
-                  opacity: layer.opacity.clamp(0.0, 1.0),
-                  child: imgWidget,
-                ),
+                child: stickerWidget,
               );
             }),
             // Render text layers (simple preview)
@@ -437,23 +454,31 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
               } catch (_) {
                 textColor = Colors.white;
               }
+              Widget textWidget = Text(
+                layer.textTransform == 'uppercase' ? layer.content.toUpperCase() : layer.content,
+                style: TextStyle(
+                  fontSize: layer.fontSize * w,
+                  color: textColor,
+                  fontWeight: layer.fontWeight == 'bold' ? FontWeight.w700 : FontWeight.w400,
+                  height: layer.lineHeight,
+                ),
+                textAlign: layer.alignment == 'center'
+                    ? TextAlign.center
+                    : (layer.alignment == 'right' ? TextAlign.right : TextAlign.left),
+                overflow: TextOverflow.clip,
+              );
+              if (layer.rotation != 0) {
+                textWidget = Transform(
+                  alignment: Alignment.topLeft,
+                  transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
+                  child: textWidget,
+                );
+              }
               return Positioned(
                 left: layer.x * w,
                 top: layer.y * h,
                 width: layer.width * w,
-                child: Text(
-                  layer.textTransform == 'uppercase' ? layer.content.toUpperCase() : layer.content,
-                  style: TextStyle(
-                    fontSize: layer.fontSize * w,
-                    color: textColor,
-                    fontWeight: layer.fontWeight == 'bold' ? FontWeight.w700 : FontWeight.w400,
-                    height: layer.lineHeight,
-                  ),
-                  textAlign: layer.alignment == 'center'
-                      ? TextAlign.center
-                      : (layer.alignment == 'right' ? TextAlign.right : TextAlign.left),
-                  overflow: TextOverflow.clip,
-                ),
+                child: textWidget,
               );
             }),
           ],
