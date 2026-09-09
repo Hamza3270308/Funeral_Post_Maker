@@ -392,6 +392,7 @@ class _EditorScreenState extends State<EditorScreen> {
     }
 
     // Restore stickers from imageLayers back to _overlayItems
+    _overlayItems.clear();
     final stickerLayers = widget.template.imageLayers.where((l) => l.type == 'sticker').toList();
     for (var layer in stickerLayers) {
       if (layer.url.isNotEmpty) {
@@ -417,7 +418,6 @@ class _EditorScreenState extends State<EditorScreen> {
         ));
       }
     }
-    widget.template.imageLayers.removeWhere((l) => l.type == 'sticker');
     
     // Save initial state for undo system
     _saveState();
@@ -1088,7 +1088,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   List<Widget> _buildSortedLayers() {
     final allLayers = <Map<String, dynamic>>[];
-    for (var layer in widget.template.imageLayers) {
+    for (var layer in widget.template.imageLayers.where((l) => l.type != 'sticker')) {
       if (!layer.hidden) allLayers.add({'zIndex': layer.zIndex, 'widget': _buildImageLayer(layer)});
     }
     for (var layer in widget.template.shapeLayers) {
@@ -1916,6 +1916,7 @@ class _EditorScreenState extends State<EditorScreen> {
         final imgW = w * 0.9 * item.scale;
         overlayChild = SizedBox(
           width: imgW,
+          height: imgW,
           child: Opacity(
             opacity: item.opacity,
             child: Transform.scale(
@@ -4141,7 +4142,7 @@ class _EditorScreenState extends State<EditorScreen> {
         'obj': layer,
       });
     }
-    for (var layer in widget.template.imageLayers) {
+    for (var layer in widget.template.imageLayers.where((l) => l.type != 'sticker')) {
       all.add({
         'id': layer.id,
         'zIndex': layer.zIndex,

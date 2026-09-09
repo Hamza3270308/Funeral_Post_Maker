@@ -408,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute(
                 builder: (_) => EditorScreen(template: template),
               ),
-            );
+            ).then((_) => _loadTemplates());
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
