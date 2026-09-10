@@ -57,9 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onCreateTapped() {
     setState(() {
-      _highlightedNavIndex = 2;
+      _activeTabIndex = 0; // Always anchor to Home tab
+      _highlightedNavIndex = 2; // Highlight Create icon while editor is open
     });
-    Navigator.of(context, rootNavigator: true).push(
+    _navigatorKeys[0].currentState?.push(
       MaterialPageRoute(
         builder: (_) => EditorScreen(
           template: Template(
@@ -77,10 +78,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     ).then((_) {
-      setState(() {
-        _highlightedNavIndex = _activeTabIndex;
-      });
-      _loadTemplates();
+      if (mounted) {
+        setState(() {
+          _activeTabIndex = 0;
+          _highlightedNavIndex = 0; // Always return to Home tab
+        });
+        _loadTemplates();
+      }
     });
   }
 
@@ -410,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: () {
-            Navigator.of(context, rootNavigator: true).push(
+            _navigatorKeys[_activeTabIndex].currentState?.push(
               MaterialPageRoute(
                 builder: (_) => EditorScreen(template: template),
               ),

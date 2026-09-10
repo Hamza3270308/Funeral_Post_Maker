@@ -166,7 +166,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     
     return GestureDetector(
       onTap: () {
-        Navigator.of(context, rootNavigator: true).push(
+        Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => EditorScreen(template: template),
           ),

@@ -213,7 +213,7 @@ class _ExportScreenState extends State<ExportScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 36.0),
+          padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 120.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
