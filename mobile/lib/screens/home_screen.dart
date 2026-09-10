@@ -9,6 +9,7 @@ import 'settings_screen.dart';
 import '../services/user_settings_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/template_card_preview.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -417,43 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isImageBg ? Colors.white : _parseHexColor(bgValue),
-                        ),
-                        child: isImageBg && bgValue.isNotEmpty
-                            ? (_resolveImageUrl(bgValue).startsWith('assets/')
-                                ? Image.asset(
-                                    _resolveImageUrl(bgValue),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Center(
-                                      child: Icon(Icons.broken_image_rounded, color: AppTheme.textGray),
-                                    ),
-                                  )
-                                : CachedNetworkImage(
-                                    imageUrl: _resolveImageUrl(bgValue),
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
-                                      color: const Color(0xFFF1F5F9),
-                                      child: const Center(
-                                        child: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        ),
-                                      ),
-                                    ),
-                                    errorWidget: (context, error, stackTrace) {
-                                      return const Center(
-                                        child: Icon(
-                                          Icons.broken_image_rounded,
-                                          color: AppTheme.textGray,
-                                        ),
-                                      );
-                                    },
-                                  ))
-                            : null,
-                      ),
+                      child: TemplateCardPreview(template: template),
                     ),
                     Positioned(
                       top: 8,

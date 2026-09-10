@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../theme/theme.dart';
 import 'editor_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/template_card_preview.dart';
 
 class SavedDesignsScreen extends StatefulWidget {
   const SavedDesignsScreen({super.key});
@@ -237,7 +238,7 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
                 fit: StackFit.expand,
                 children: [
                   // Live mini-preview of the actual template design
-                  _buildMiniPreview(template),
+                  TemplateCardPreview(template: template),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -307,180 +308,6 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Render a live scaled-down preview of the actual template layers
-  Widget _buildMiniPreview(Template template) {
-    final w = template.width;
-    final h = template.height;
-    final bg = template.background;
-
-    // Background widget
-    Widget backgroundWidget;
-    if (bg.type == 'image' && bg.value.isNotEmpty) {
-      final resolvedUrl = ApiService.resolveImageUrl(bg.value);
-      if (resolvedUrl.startsWith('assets/')) {
-        backgroundWidget = Image.asset(
-          resolvedUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(color: Colors.white),
-        );
-      } else {
-        backgroundWidget = CachedNetworkImage(
-          imageUrl: resolvedUrl,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => Container(color: Colors.grey[200]),
-          errorWidget: (_, __, ___) => Container(color: Colors.white),
-        );
-      }
-    } else if (bg.type == 'color' && bg.value.startsWith('#')) {
-      try {
-        var hexStr = bg.value.replaceFirst('#', '');
-        if (hexStr.length == 6) {
-          hexStr = 'FF$hexStr';
-        }
-        final color = Color(int.parse(hexStr, radix: 16));
-        backgroundWidget = Container(color: color);
-      } catch (_) {
-        backgroundWidget = Container(color: Colors.white);
-      }
-    } else {
-      backgroundWidget = Container(color: Colors.white);
-    }
-
-    return FittedBox(
-      fit: BoxFit.cover,
-      child: SizedBox(
-        width: w,
-        height: h,
-        child: Stack(
-          children: [
-            Positioned.fill(child: backgroundWidget),
-            // Render shape layers
-            ...template.shapeLayers.map((layer) {
-              final colorStr = layer.color.trim();
-              Color fillColor;
-              try {
-                fillColor = colorStr.startsWith('#')
-                    ? Color(int.parse('FF${colorStr.replaceFirst('#', '')}', radix: 16))
-                    : const Color(0xFF888888);
-              } catch (_) {
-                fillColor = const Color(0xFF888888);
-              }
-              Widget shapeWidget = Opacity(
-                opacity: layer.opacity.clamp(0.0, 1.0),
-                child: Container(color: fillColor),
-              );
-              if (layer.rotation != 0) {
-                shapeWidget = Transform(
-                  alignment: Alignment.topLeft,
-                  transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
-                  child: shapeWidget,
-                );
-              }
-              return Positioned(
-                left: layer.x * w,
-                top: layer.y * h,
-                width: layer.width * w,
-                height: layer.height * h,
-                child: shapeWidget,
-              );
-            }),
-            // Render sticker image layers (non-frame)
-            ...template.imageLayers.where((l) => l.type == 'sticker').map((layer) {
-              final resolvedUrl = ApiService.resolveImageUrl(layer.url);
-              Widget imgWidget;
-              if (resolvedUrl.startsWith('assets/')) {
-                imgWidget = Image.asset(resolvedUrl, fit: BoxFit.fill, errorBuilder: (_, __, ___) => const SizedBox.shrink());
-              } else if (resolvedUrl.contains('/flowers/')) {
-                final flowerFileName = resolvedUrl.split('/flowers/').last.split('?').first;
-                imgWidget = Image.asset(
-                  'assets/flowers/$flowerFileName',
-                  fit: BoxFit.fill,
-                  errorBuilder: (_, __, ___) => CachedNetworkImage(
-                    imageUrl: resolvedUrl,
-                    fit: BoxFit.fill,
-                    placeholder: (_, __) => const Center(
-                      child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                    ),
-                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                );
-              } else if (resolvedUrl.startsWith('http')) {
-                imgWidget = CachedNetworkImage(
-                  imageUrl: resolvedUrl,
-                  fit: BoxFit.fill,
-                  placeholder: (_, __) => const Center(
-                    child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                  ),
-                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                );
-              } else {
-                return const SizedBox.shrink();
-              }
-              
-              Widget stickerWidget = Opacity(
-                opacity: layer.opacity.clamp(0.0, 1.0),
-                child: imgWidget,
-              );
-              if (layer.rotation != 0) {
-                stickerWidget = Transform(
-                  alignment: Alignment.topLeft,
-                  transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
-                  child: stickerWidget,
-                );
-              }
-              return Positioned(
-                left: layer.x * w,
-                top: layer.y * h,
-                width: layer.width * w,
-                height: layer.height * h,
-                child: stickerWidget,
-              );
-            }),
-            // Render text layers (simple preview)
-            ...template.textLayers.map((layer) {
-              Color textColor;
-              try {
-                var hexStr = layer.color.replaceFirst('#', '');
-                if (hexStr.length == 6) {
-                  hexStr = 'FF$hexStr';
-                }
-                textColor = Color(int.parse(hexStr, radix: 16));
-              } catch (_) {
-                textColor = Colors.white;
-              }
-              Widget textWidget = Text(
-                layer.textTransform == 'uppercase' ? layer.content.toUpperCase() : layer.content,
-                style: TextStyle(
-                  fontSize: layer.fontSize * w,
-                  color: textColor,
-                  fontWeight: layer.fontWeight == 'bold' ? FontWeight.w700 : FontWeight.w400,
-                  height: layer.lineHeight,
-                ),
-                textAlign: layer.alignment == 'center'
-                    ? TextAlign.center
-                    : (layer.alignment == 'right' ? TextAlign.right : TextAlign.left),
-                overflow: TextOverflow.clip,
-              );
-              if (layer.rotation != 0) {
-                textWidget = Transform(
-                  alignment: Alignment.topLeft,
-                  transform: Matrix4.rotationZ(layer.rotation * (pi / 180.0)),
-                  child: textWidget,
-                );
-              }
-              return Positioned(
-                left: layer.x * w,
-                top: layer.y * h,
-                width: layer.width * w,
-                child: textWidget,
-              );
-            }),
           ],
         ),
       ),

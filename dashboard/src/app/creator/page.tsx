@@ -1140,6 +1140,40 @@ function CreatorStudio() {
       bgValue = solidColor;
     }
 
+    let capturedThumbnailUrl = backgroundType === 'image' ? background || '' : '';
+    if (!isAutoSave) {
+      try {
+        const canvasEl = document.getElementById('creator-canvas-container');
+        if (canvasEl) {
+          const html2canvas = (await import('html2canvas')).default;
+          const canvas = await html2canvas(canvasEl, {
+            scale: 0.5,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: null
+          });
+          const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+          if (blob) {
+            const formData = new FormData();
+            formData.append('file', blob, `thumb_${Date.now()}.jpg`);
+            const upRes = await fetch(`${apiBase}/api/upload`, {
+              method: 'POST',
+              body: formData
+            });
+            if (upRes.ok) {
+              const upData = await upRes.json();
+              if (upData.url) {
+                capturedThumbnailUrl = upData.url;
+              }
+            }
+          }
+        }
+      } catch (thumbErr) {
+        console.warn('Thumbnail generation skipped:', thumbErr);
+      }
+    }
+
     const payload = {
       title: templateName,
 
@@ -1153,7 +1187,7 @@ function CreatorStudio() {
       textLayers,
       imageLayers,
       shapeLayers,
-      thumbnailUrl: backgroundType === 'image' ? background || '' : ''
+      thumbnailUrl: capturedThumbnailUrl
     };
 
     try {
@@ -1412,6 +1446,7 @@ function CreatorStudio() {
         </div>
         
         <div 
+          id="creator-canvas-container"
           style={{
             width: previewWidth,
             height: previewHeight,
