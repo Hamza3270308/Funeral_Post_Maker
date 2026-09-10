@@ -12,6 +12,7 @@ class UserSettingsService extends ChangeNotifier {
   String _exportFormat = 'PNG (High Quality)';
   bool _isDarkMode = false;
   List<String> _favoriteTemplateIds = [];
+  List<String> _unlockedTemplateIds = [];
   bool _hasSeenOnboarding = false;
   bool _isGuest = false;
 
@@ -20,8 +21,22 @@ class UserSettingsService extends ChangeNotifier {
   String get exportFormat => _exportFormat;
   bool get isDarkMode => _isDarkMode;
   List<String> get favoriteTemplateIds => _favoriteTemplateIds;
+  List<String> get unlockedTemplateIds => _unlockedTemplateIds;
   bool get hasSeenOnboarding => _hasSeenOnboarding;
   bool get isGuest => _isGuest;
+
+  bool isTemplateUnlocked(String templateId) {
+    if (templateId == 'new') return true;
+    return _unlockedTemplateIds.contains(templateId);
+  }
+
+  Future<void> unlockTemplate(String templateId) async {
+    if (!_unlockedTemplateIds.contains(templateId)) {
+      _unlockedTemplateIds.add(templateId);
+      notifyListeners();
+      await _save();
+    }
+  }
 
   Future<void> init() async {
     try {
@@ -35,6 +50,9 @@ class UserSettingsService extends ChangeNotifier {
           _isDarkMode = data['isDarkMode'] ?? _isDarkMode;
           if (data['favoriteTemplateIds'] != null) {
             _favoriteTemplateIds = List<String>.from(data['favoriteTemplateIds']);
+          }
+          if (data['unlockedTemplateIds'] != null) {
+            _unlockedTemplateIds = List<String>.from(data['unlockedTemplateIds']);
           }
           _hasSeenOnboarding = data['hasSeenOnboarding'] ?? _hasSeenOnboarding;
           _isGuest = data['isGuest'] ?? _isGuest;
@@ -60,6 +78,7 @@ class UserSettingsService extends ChangeNotifier {
         'exportFormat': _exportFormat,
         'isDarkMode': _isDarkMode,
         'favoriteTemplateIds': _favoriteTemplateIds,
+        'unlockedTemplateIds': _unlockedTemplateIds,
         'hasSeenOnboarding': _hasSeenOnboarding,
         'isGuest': _isGuest,
       };

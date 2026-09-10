@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/template.dart';
 import '../services/api_service.dart';
 import '../theme/theme.dart';
+import '../services/ad_service.dart';
 
 class ExportScreen extends StatefulWidget {
   final String imagePath;
@@ -188,6 +189,65 @@ class _ExportScreenState extends State<ExportScreen> {
     }
   }
 
+
+  void _handleSaveToDevice() {
+    if (_isSavingDevice) return;
+
+    if (!AdService.instance.isRewardedAdsEnabled) {
+      _saveToDevice();
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.video_library_rounded, color: AppTheme.accentNeon),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Watch Ad to Download',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Watch a short video ad to download your high-resolution memorial tribute for free.',
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              AdService.instance.showRewardedAd(
+                context,
+                onUserEarnedReward: () {
+                  _saveToDevice();
+                },
+              );
+            },
+            icon: const Icon(Icons.play_arrow_rounded, color: Colors.black),
+            label: const Text(
+              'Watch Ad',
+              style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentNeon,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -256,7 +316,7 @@ class _ExportScreenState extends State<ExportScreen> {
                   trailing: _isSavingDevice
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                  onTap: _isSavingDevice ? null : _saveToDevice,
+                  onTap: _isSavingDevice ? null : _handleSaveToDevice,
                 ),
               ),
               const SizedBox(height: 12),

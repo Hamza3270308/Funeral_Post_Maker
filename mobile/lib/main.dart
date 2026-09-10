@@ -4,11 +4,13 @@ import 'screens/splash_screen.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'services/user_settings_service.dart';
+import 'services/ad_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await UserSettingsService.instance.init();
+  await AdService.instance.init();
   runApp(const MyApp());
 }
 

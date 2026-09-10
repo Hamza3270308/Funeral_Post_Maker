@@ -20,6 +20,7 @@ import 'export_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/user_settings_service.dart';
+import '../services/ad_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 enum SelectedElementType {
   none,
@@ -112,6 +113,10 @@ class _EditorScreenState extends State<EditorScreen> {
   final List<EditorStateSnapshot> _history = [];
   int _historyIndex = -1;
 
+  void _registerElementAction() {
+    AdService.instance.registerAction(context);
+  }
+
   void _saveState() {
     // If we're not at the end of the history (i.e. we undid something and are now making a new change),
     // we must discard all future redo states.
@@ -128,6 +133,9 @@ class _EditorScreenState extends State<EditorScreen> {
       localPhotoPath: _localPhotoPath,
     ));
     _historyIndex++;
+
+    // Track user action for 10-15 element interstitial ads
+    _registerElementAction();
   }
 
   void _undo() {
@@ -1297,6 +1305,7 @@ class _EditorScreenState extends State<EditorScreen> {
           } else {
             _selectedType = SelectedElementType.shape;
             _selectedOverlayId = layer.id;
+            _registerElementAction();
           }
         });
       },
@@ -1544,6 +1553,7 @@ class _EditorScreenState extends State<EditorScreen> {
             _selectedType = elementType;
             _selectedOverlayId = null;
             _openIntegratedTextTrayFor(elementType);
+            _registerElementAction();
           }
         });
       },
@@ -1705,6 +1715,7 @@ class _EditorScreenState extends State<EditorScreen> {
             _selectedType = SelectedElementType.photo;
             _selectedOverlayId = null;
             _activeTray = ActiveTrayType.photo;
+            _registerElementAction();
           }
         });
       },
@@ -1981,6 +1992,7 @@ class _EditorScreenState extends State<EditorScreen> {
               if (!item.graphic.isImageOverlay) {
                 _activeTray = ActiveTrayType.colors;
               }
+              _registerElementAction();
             }
           });
         },

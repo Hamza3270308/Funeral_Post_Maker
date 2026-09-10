@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/template.dart';
 import '../services/api_service.dart';
 import '../theme/theme.dart';
+import '../services/ad_service.dart';
 import 'editor_screen.dart';
 import 'favorites_screen.dart';
 import 'profile_screen.dart';
@@ -414,11 +415,17 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: () {
-            _navigatorKeys[_activeTabIndex].currentState?.push(
-              MaterialPageRoute(
-                builder: (_) => EditorScreen(template: template),
-              ),
-            ).then((_) => _loadTemplates());
+            AdService.instance.showUnlockTemplateDialog(
+              context,
+              template: template,
+              onUnlocked: () {
+                _navigatorKeys[_activeTabIndex].currentState?.push(
+                  MaterialPageRoute(
+                    builder: (_) => EditorScreen(template: template),
+                  ),
+                ).then((_) => _loadTemplates());
+              },
+            );
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -428,6 +435,42 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Positioned.fill(
                       child: TemplateCardPreview(template: template),
+                    ),
+                    ListenableBuilder(
+                      listenable: UserSettingsService.instance,
+                      builder: (context, _) {
+                        final isUnlocked = UserSettingsService.instance.isTemplateUnlocked(template.id);
+                        if (isUnlocked || !AdService.instance.isRewardedAdsEnabled) {
+                          return const SizedBox.shrink();
+                        }
+                        return Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.65),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.lock_rounded, color: Color(0xFFFFD54F), size: 13),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Watch to Unlock',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     Positioned(
                       top: 8,
