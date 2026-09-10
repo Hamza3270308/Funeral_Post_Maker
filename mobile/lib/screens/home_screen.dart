@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _highlightedNavIndex = 2;
     });
-    _navigatorKeys[_activeTabIndex].currentState?.push(
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         builder: (_) => EditorScreen(
           template: Template(
@@ -76,7 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
+    ).then((_) {
+      setState(() {
+        _highlightedNavIndex = _activeTabIndex;
+      });
+      _loadTemplates();
+    });
   }
 
   Widget _buildNavItem(int index, IconData icon, String label) {
@@ -405,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: () {
-            _navigatorKeys[_activeTabIndex].currentState?.push(
+            Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(
                 builder: (_) => EditorScreen(template: template),
               ),

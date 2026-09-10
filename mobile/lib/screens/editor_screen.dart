@@ -773,8 +773,7 @@ class _EditorScreenState extends State<EditorScreen> {
           widget.template.imageLayers.removeWhere((l) => l.type == 'sticker');
           widget.template.imageLayers.addAll(stickerLayers);
 
-          Navigator.push(
-            context,
+          Navigator.of(context, rootNavigator: true).push(
             MaterialPageRoute(
               builder: (_) => ExportScreen(
                 imagePath: filePath,

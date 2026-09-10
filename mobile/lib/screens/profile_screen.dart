@@ -151,8 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'My Designs & Projects',
                     subtitle: 'View your editable templates',
                     onTap: () {
-                      Navigator.push(
-                        context,
+                      Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
                           builder: (_) => const SavedDesignsScreen(),
                         ),
@@ -166,8 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'Saved Templates / Favorites',
                     subtitle: 'Your favorite template designs',
                     onTap: () {
-                      Navigator.push(
-                        context,
+                      Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
                           builder: (_) => Scaffold(
                             backgroundColor: AppTheme.lightBackground,

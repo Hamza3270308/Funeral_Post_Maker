@@ -210,7 +210,7 @@ class _SavedDesignsScreenState extends State<SavedDesignsScreen> {
   Widget _buildDesignCard(Template template) {
     return GestureDetector(
       onTap: () async {
-        await Navigator.of(context).push(
+        await Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute(
             builder: (_) => EditorScreen(template: template),
           ),

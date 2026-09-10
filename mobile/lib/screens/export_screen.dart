@@ -191,6 +191,7 @@ class _ExportScreenState extends State<ExportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.lightBackground,
       appBar: AppBar(
         title: Row(
           children: [
@@ -210,14 +211,19 @@ class _ExportScreenState extends State<ExportScreen> {
           ],
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            // Preview Card Container
-            Expanded(
-              child: Center(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 36.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Preview Card Container
+              Center(
                 child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.46,
+                    minHeight: 180,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
@@ -235,42 +241,44 @@ class _ExportScreenState extends State<ExportScreen> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-            // Save to Device Option Card
-            Card(
-              color: Colors.white,
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const Icon(Icons.download_rounded, color: AppTheme.textDark, size: 32),
-                title: const Text('Save to Device', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Download high-res PNG image to your photo library'),
-                trailing: _isSavingDevice
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: _isSavingDevice ? null : _saveToDevice,
+              // Save to Device Option Card
+              Card(
+                color: Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  leading: const Icon(Icons.download_rounded, color: AppTheme.textDark, size: 30),
+                  title: const Text('Save to Device', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  subtitle: const Text('Download high-res PNG image to your photo library', style: TextStyle(fontSize: 13)),
+                  trailing: _isSavingDevice
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: _isSavingDevice ? null : _saveToDevice,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-            // Save to App Templates & Favorites Option Card
-            Card(
-              color: Colors.white,
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const Icon(Icons.cloud_upload_rounded, color: AppTheme.goldAccent, size: 32),
-                title: const Text('Save to App Templates & Favorites', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Save design project to edit later on Web or Mobile'),
-                trailing: _isSavingApp
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: _isSavingApp ? null : _saveToAppDashboard,
+              // Save to App Templates & Favorites Option Card
+              Card(
+                color: Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  leading: const Icon(Icons.cloud_upload_rounded, color: AppTheme.goldAccent, size: 30),
+                  title: const Text('Save to App Templates & Favorites', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  subtitle: const Text('Save design project to edit later on Web or Mobile', style: TextStyle(fontSize: 13)),
+                  trailing: _isSavingApp
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: _isSavingApp ? null : _saveToAppDashboard,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
