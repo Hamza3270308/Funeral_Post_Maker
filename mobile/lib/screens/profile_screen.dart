@@ -182,16 +182,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             
-            if (AuthService.instance.currentUser != null) ...[
+            if (AuthService.instance.currentUser == null) ...[
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Link Your Google Account',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textDark,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Sign in to save your memorial tributes and export high-resolution designs.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textGray,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final credential = await AuthService.instance.signInWithGoogle();
+                          if (credential != null) {
+                            await UserSettingsService.instance.setGuest(false);
+                            final user = AuthService.instance.currentUser;
+                            if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+                              await UserSettingsService.instance.setName(user.displayName!);
+                            }
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Welcome! Google account linked successfully.'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } else {
+                            final errMsg = AuthService.instance.lastErrorMessage;
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(errMsg != null ? 'Sign in error: $errMsg' : 'Sign in cancelled or failed.'),
+                                  backgroundColor: Colors.red[800],
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.textDark,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.g_mobiledata, size: 28),
+                            SizedBox(width: 8),
+                            Text(
+                              'Sign in with Google',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () async {
                     await AuthService.instance.signOut();
+                    await UserSettingsService.instance.setGuest(true);
                     if (context.mounted) {
-                      Navigator.of(context, rootNavigator: true).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Signed out.')),
                       );
                     }
                   },

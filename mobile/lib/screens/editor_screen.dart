@@ -828,9 +828,27 @@ class _EditorScreenState extends State<EditorScreen> {
               
               if (credential != null) {
                 await UserSettingsService.instance.setGuest(false);
+                final user = AuthService.instance.currentUser;
+                if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+                  await UserSettingsService.instance.setName(user.displayName!);
+                }
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Successfully signed in! You can now download your design.')),
+                    const SnackBar(
+                      content: Text('Signed in! Exporting your design now...'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  _exportAndShare();
+                }
+              } else {
+                if (mounted) {
+                  final errMsg = AuthService.instance.lastErrorMessage;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(errMsg != null ? 'Sign in error: $errMsg' : 'Sign in was cancelled or failed.'),
+                      backgroundColor: Colors.red[800],
+                    ),
                   );
                 }
               }

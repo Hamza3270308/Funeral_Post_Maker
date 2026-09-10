@@ -8,7 +8,11 @@ class AuthService {
   static final AuthService instance = AuthService._privateConstructor();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '19528064541-b92md76ophrd1rbcmc33drd0p23usd97.apps.googleusercontent.com',
+  );
+
+  String? lastErrorMessage;
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -18,6 +22,7 @@ class AuthService {
 
   // Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
+    lastErrorMessage = null;
     try {
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -39,6 +44,7 @@ class AuthService {
       // Once signed in, return the UserCredential
       return await _auth.signInWithCredential(credential);
     } catch (e) {
+      lastErrorMessage = e.toString();
       if (kDebugMode) {
         print("Error signing in with Google: $e");
       }

@@ -35,6 +35,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
   ];
 
+  bool _isLoading = false;
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+    final credential = await AuthService.instance.signInWithGoogle();
+    if (!mounted) return;
+
+    if (credential != null) {
+      await UserSettingsService.instance.setHasSeenOnboarding(true);
+      await UserSettingsService.instance.setGuest(false);
+      final user = AuthService.instance.currentUser;
+      if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+        await UserSettingsService.instance.setName(user.displayName!);
+      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } else {
+      setState(() => _isLoading = false);
+      final errMsg = AuthService.instance.lastErrorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errMsg != null ? 'Sign in error: $errMsg' : 'Failed to sign in with Google.'),
+          backgroundColor: Colors.red[800],
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleGuestSignIn() async {
+    await UserSettingsService.instance.setHasSeenOnboarding(true);
+    await UserSettingsService.instance.setGuest(true);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,55 +172,94 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 32.0),
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
               child: Column(
                 children: [
-                  // Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (_currentPage < _slides.length - 1) {
+                  if (_currentPage == _slides.length - 1) ...[
+                    // Google Sign-In Button on last slide
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleGoogleSignIn,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppTheme.textDark,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          elevation: 5,
+                          shadowColor: Colors.black.withOpacity(0.5),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(color: AppTheme.textDark, strokeWidth: 2),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.g_mobiledata, size: 28),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Continue with Google',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Guest Button on last slide
+                    TextButton(
+                      onPressed: _isLoading ? null : _handleGuestSignIn,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white.withOpacity(0.7),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                      ),
+                      child: const Text(
+                        'Continue as Guest',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // Next Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
                           _pageController.nextPage(
                             duration: const Duration(milliseconds: 300),
                             curve: Curves.easeIn,
                           );
-                        } else {
-                          // Complete onboarding
-                          await UserSettingsService.instance.setHasSeenOnboarding(true);
-                          if (context.mounted) {
-                            final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-                            final isGuest = UserSettingsService.instance.isGuest;
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => (!isLoggedIn && !isGuest) 
-                                    ? const LoginScreen() 
-                                    : const HomeScreen(),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _currentPage == _slides.length - 1 ? Colors.white : AppTheme.accentNeon,
-                        foregroundColor: AppTheme.textDark,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accentNeon,
+                          foregroundColor: AppTheme.textDark,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          elevation: 5,
+                          shadowColor: Colors.black.withOpacity(0.5),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        elevation: 5,
-                        shadowColor: Colors.black.withOpacity(0.5),
-                      ),
-                      child: Text(
-                        _currentPage == _slides.length - 1 ? 'Get Started' : 'Next',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                        child: const Text(
+                          'Next',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 24),
                   // Page Indicators
                   Row(
