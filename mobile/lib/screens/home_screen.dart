@@ -8,6 +8,7 @@ import 'favorites_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import '../services/user_settings_service.dart';
+import '../services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/template_card_preview.dart';
@@ -552,11 +553,21 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Text(
-                UserSettingsService.instance.isGuest
-                    ? 'Hello, Guest'
-                    : 'Hello, ${FirebaseAuth.instance.currentUser?.displayName?.split(' ').first ?? 'User'}',
-                style: const TextStyle(fontSize: 24, letterSpacing: -0.5, fontWeight: FontWeight.bold),
+              child: StreamBuilder<User?>(
+                stream: AuthService.instance.authStateChanges,
+                builder: (context, snapshot) {
+                  final user = AuthService.instance.currentUser;
+                  final firstName = user?.displayName?.split(' ').first;
+                  final greeting = (user != null && firstName != null && firstName.isNotEmpty)
+                      ? 'Hello, $firstName'
+                      : (UserSettingsService.instance.isGuest
+                          ? 'Hello, Guest'
+                          : 'Hello, ${UserSettingsService.instance.name.isNotEmpty ? UserSettingsService.instance.name.split(' ').first : 'Friend'}');
+                  return Text(
+                    greeting,
+                    style: const TextStyle(fontSize: 24, letterSpacing: -0.5, fontWeight: FontWeight.bold),
+                  );
+                },
               ),
             ),
           ),
