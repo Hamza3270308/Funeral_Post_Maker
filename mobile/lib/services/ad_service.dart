@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/template.dart';
 import 'user_settings_service.dart';
 import '../theme/theme.dart';
@@ -52,11 +53,32 @@ class AdService {
   int get appOpenTimeoutSeconds => _appOpenTimeoutSeconds;
   bool get hasShownAppOpenThisSession => _hasShownAppOpenThisSession;
 
+  // --- Safe Ad Unit ID Getters (Force Google Test IDs in Debug/Testing) ---
+  String get appOpenAdUnitId {
+    if (kDebugMode) return testAppOpenAdId;
+    return _appOpenAdUnitId;
+  }
+
+  String get interstitialAdUnitId {
+    if (kDebugMode) return testInterstitialAdId;
+    return _interstitialAdUnitId;
+  }
+
+  String get rewardedAdUnitId {
+    if (kDebugMode) return testRewardedAdId;
+    return _rewardedAdUnitId;
+  }
+
   /// Initialize Mobile Ads SDK and Firebase Remote Config
   Future<void> init() async {
     if (_isInitialized) return;
     try {
       await MobileAds.instance.initialize();
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          testDeviceIds: <String>['EMULATOR'],
+        ),
+      );
       await _initRemoteConfig();
       _isInitialized = true;
       
@@ -113,14 +135,23 @@ class AdService {
       _appOpenTimeoutSeconds = remoteConfig.getInt('app_open_timeout_seconds');
       if (_appOpenTimeoutSeconds < 4 || _appOpenTimeoutSeconds > 15) _appOpenTimeoutSeconds = 6;
 
-      final remoteAppOpen = remoteConfig.getString('admob_app_open_id');
-      if (remoteAppOpen.isNotEmpty) _appOpenAdUnitId = remoteAppOpen;
+      // Support both user's key names (ad_app_open_id) and legacy (admob_app_open_id)
+      final rAppOpen = remoteConfig.getString('ad_app_open_id').isNotEmpty
+          ? remoteConfig.getString('ad_app_open_id')
+          : remoteConfig.getString('admob_app_open_id');
+      if (rAppOpen.isNotEmpty) _appOpenAdUnitId = rAppOpen;
 
-      final remoteInterstitial = remoteConfig.getString('admob_interstitial_id');
-      if (remoteInterstitial.isNotEmpty) _interstitialAdUnitId = remoteInterstitial;
+      final rInterstitial = remoteConfig.getString('ad_interstitial_id').isNotEmpty
+          ? remoteConfig.getString('ad_interstitial_id')
+          : remoteConfig.getString('admob_interstitial_id');
+      if (rInterstitial.isNotEmpty) _interstitialAdUnitId = rInterstitial;
 
-      final remoteRewarded = remoteConfig.getString('admob_rewarded_id');
-      if (remoteRewarded.isNotEmpty) _rewardedAdUnitId = remoteRewarded;
+      final rRewarded = remoteConfig.getString('ad_rewarded_id').isNotEmpty
+          ? remoteConfig.getString('ad_rewarded_id')
+          : remoteConfig.getString('admob_rewarded_id');
+      if (rRewarded.isNotEmpty) _rewardedAdUnitId = rRewarded;
+
+      debugPrint('[AdService] Safety Check: kDebugMode= (Forcing Google Test IDs: )');
 
       debugPrint('[AdService] Remote Config loaded: ads_enabled=$_adsEnabled, app_open=$_appOpenAdsEnabled, interstitial=$_interstitialAdsEnabled, rewarded=$_rewardedAdsEnabled');
     } catch (e) {
@@ -144,7 +175,7 @@ class AdService {
     _isAppOpenLoading = true;
 
     AppOpenAd.load(
-      adUnitId: _appOpenAdUnitId,
+      adUnitId: appOpenAdUnitId,
       request: const AdRequest(),
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) {
@@ -223,7 +254,7 @@ class AdService {
 
     _isInterstitialLoading = true;
     InterstitialAd.load(
-      adUnitId: _interstitialAdUnitId,
+      adUnitId: interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
@@ -296,7 +327,7 @@ class AdService {
 
     _isRewardedLoading = true;
     RewardedAd.load(
-      adUnitId: _rewardedAdUnitId,
+      adUnitId: rewardedAdUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
