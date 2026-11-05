@@ -11,6 +11,11 @@ class AdService {
   static final AdService instance = AdService._internal();
   AdService._internal();
 
+  // --- Default Production Ad Unit IDs for Android ---
+  static const String defaultAppOpenAdId = 'ca-app-pub-1105449328380981/7071024932';
+  static const String defaultInterstitialAdId = 'ca-app-pub-1105449328380981/3501164210';
+  static const String defaultRewardedAdId = 'ca-app-pub-1105449328380981/7248837535';
+
   // --- Official Google AdMob Test Ad Unit IDs for Android ---
   static const String testAppOpenAdId = 'ca-app-pub-3940256099942544/9257395921';
   static const String testInterstitialAdId = 'ca-app-pub-3940256099942544/1033173712';
@@ -25,13 +30,13 @@ class AdService {
   bool _appOpenAdsEnabled = true;
   bool _interstitialAdsEnabled = true;
   bool _rewardedAdsEnabled = true;
-  int _interstitialActionCounterThreshold = 12; // 10-15 actions
-  int _interstitialCooldownSeconds = 75;
-  int _appOpenTimeoutSeconds = 6; // 6-8 seconds
+  int _interstitialActionCounterThreshold = 10; // Trigger interstitial at 10 actions
+  static const int _interstitialPreloadThreshold = 8; // Preload just-in-time at 8th action
+  int _appOpenTimeoutSeconds = 8; // 8 seconds timeout
 
-  String _appOpenAdUnitId = testAppOpenAdId;
-  String _interstitialAdUnitId = testInterstitialAdId;
-  String _rewardedAdUnitId = testRewardedAdId;
+  String _appOpenAdUnitId = defaultAppOpenAdId;
+  String _interstitialAdUnitId = defaultInterstitialAdId;
+  String _rewardedAdUnitId = defaultRewardedAdId;
 
   // --- Ad Instances ---
   AppOpenAd? _appOpenAd;
@@ -40,18 +45,20 @@ class AdService {
   InterstitialAd? _interstitialAd;
   bool _isInterstitialLoading = false;
   int _currentActionCount = 0;
-  DateTime? _lastInterstitialShowTime;
 
   RewardedAd? _rewardedAd;
   bool _isRewardedLoading = false;
 
   // --- Getters ---
+  bool get isInitialized => _isInitialized;
   bool get isAdsEnabled => _adsEnabled;
   bool get isAppOpenAdsEnabled => _adsEnabled && _appOpenAdsEnabled;
   bool get isInterstitialAdsEnabled => _adsEnabled && _interstitialAdsEnabled;
   bool get isRewardedAdsEnabled => _adsEnabled && _rewardedAdsEnabled;
   int get appOpenTimeoutSeconds => _appOpenTimeoutSeconds;
   bool get hasShownAppOpenThisSession => _hasShownAppOpenThisSession;
+  bool get isRewardedLoading => _isRewardedLoading;
+  bool get isRewardedAdReady => _rewardedAd != null;
 
   // --- Safe Ad Unit ID Getters (Force Google Test IDs in Debug/Testing) ---
   String get appOpenAdUnitId {
@@ -76,19 +83,16 @@ class AdService {
       await MobileAds.instance.initialize();
       await MobileAds.instance.updateRequestConfiguration(
         RequestConfiguration(
-          testDeviceIds: <String>['EMULATOR'],
+          tagForChildDirectedTreatment: TagForChildDirectedTreatment.unspecified,
+          tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.unspecified,
         ),
       );
       await _initRemoteConfig();
       _isInitialized = true;
       
-      // Preload background ads if enabled
-      if (isInterstitialAdsEnabled) {
-        preloadInterstitialAd();
-      }
-      if (isRewardedAdsEnabled) {
-        preloadRewardedAd();
-      }
+      // NOTE: Interstitial and Rewarded ads are NOT preloaded on startup.
+      // Interstitial is preloaded just-in-time at action #8, and Rewarded is preloaded when Export is clicked.
+      // This protects show rate from unused matched requests.
     } catch (e) {
       debugPrint('[AdService] Init error: $e');
       _isInitialized = true;
@@ -106,54 +110,44 @@ class AdService {
 
       // Set default fallback values
       await remoteConfig.setDefaults(<String, dynamic>{
-        'ads_enabled': true,
-        'app_open_ads_enabled': true,
-        'interstitial_ads_enabled': true,
-        'rewarded_ads_enabled': true,
-        'interstitial_action_counter': 12,
-        'interstitial_cooldown_seconds': 75,
-        'app_open_timeout_seconds': 6,
-        'admob_app_open_id': testAppOpenAdId,
-        'admob_interstitial_id': testInterstitialAdId,
-        'admob_rewarded_id': testRewardedAdId,
+        'fpm_ads_enabled': true,
+        'fpm_app_open_ads_enabled': true,
+        'fpm_interstitial_ads_enabled': true,
+        'fpm_rewarded_ads_enabled': true,
+        'fpm_interstitial_action_counter': 10,
+        'fpm_app_open_timeout_seconds': 7,
+        'fpm_app_open_ad_id': defaultAppOpenAdId,
+        'fpm_interstitial_ad_id': defaultInterstitialAdId,
+        'fpm_rewarded_ad_id': defaultRewardedAdId,
       });
 
       // Try fetching and activating Remote Config
       await remoteConfig.fetchAndActivate();
 
       // Read values into memory
-      _adsEnabled = remoteConfig.getBool('ads_enabled');
-      _appOpenAdsEnabled = remoteConfig.getBool('app_open_ads_enabled');
-      _interstitialAdsEnabled = remoteConfig.getBool('interstitial_ads_enabled');
-      _rewardedAdsEnabled = remoteConfig.getBool('rewarded_ads_enabled');
-      _interstitialActionCounterThreshold = remoteConfig.getInt('interstitial_action_counter');
-      if (_interstitialActionCounterThreshold <= 0) _interstitialActionCounterThreshold = 12;
+      _adsEnabled = remoteConfig.getBool('fpm_ads_enabled');
+      _appOpenAdsEnabled = remoteConfig.getBool('fpm_app_open_ads_enabled');
+      _interstitialAdsEnabled = remoteConfig.getBool('fpm_interstitial_ads_enabled');
+      _rewardedAdsEnabled = remoteConfig.getBool('fpm_rewarded_ads_enabled');
+      
+      _interstitialActionCounterThreshold = remoteConfig.getInt('fpm_interstitial_action_counter');
+      if (_interstitialActionCounterThreshold <= 0) _interstitialActionCounterThreshold = 10;
 
-      _interstitialCooldownSeconds = remoteConfig.getInt('interstitial_cooldown_seconds');
-      if (_interstitialCooldownSeconds <= 0) _interstitialCooldownSeconds = 75;
+      _appOpenTimeoutSeconds = remoteConfig.getInt('fpm_app_open_timeout_seconds');
+      if (_appOpenTimeoutSeconds < 4 || _appOpenTimeoutSeconds > 15) _appOpenTimeoutSeconds = 8;
 
-      _appOpenTimeoutSeconds = remoteConfig.getInt('app_open_timeout_seconds');
-      if (_appOpenTimeoutSeconds < 4 || _appOpenTimeoutSeconds > 15) _appOpenTimeoutSeconds = 6;
-
-      // Support both user's key names (ad_app_open_id) and legacy (admob_app_open_id)
-      final rAppOpen = remoteConfig.getString('ad_app_open_id').isNotEmpty
-          ? remoteConfig.getString('ad_app_open_id')
-          : remoteConfig.getString('admob_app_open_id');
+      final rAppOpen = remoteConfig.getString('fpm_app_open_ad_id');
       if (rAppOpen.isNotEmpty) _appOpenAdUnitId = rAppOpen;
 
-      final rInterstitial = remoteConfig.getString('ad_interstitial_id').isNotEmpty
-          ? remoteConfig.getString('ad_interstitial_id')
-          : remoteConfig.getString('admob_interstitial_id');
+      final rInterstitial = remoteConfig.getString('fpm_interstitial_ad_id');
       if (rInterstitial.isNotEmpty) _interstitialAdUnitId = rInterstitial;
 
-      final rRewarded = remoteConfig.getString('ad_rewarded_id').isNotEmpty
-          ? remoteConfig.getString('ad_rewarded_id')
-          : remoteConfig.getString('admob_rewarded_id');
+      final rRewarded = remoteConfig.getString('fpm_rewarded_ad_id');
       if (rRewarded.isNotEmpty) _rewardedAdUnitId = rRewarded;
 
       debugPrint('[AdService] Safety Check: kDebugMode= (Forcing Google Test IDs: )');
 
-      debugPrint('[AdService] Remote Config loaded: ads_enabled=$_adsEnabled, app_open=$_appOpenAdsEnabled, interstitial=$_interstitialAdsEnabled, rewarded=$_rewardedAdsEnabled');
+      debugPrint('[AdService] Remote Config loaded: ads_enabled=$_adsEnabled, app_open=$_appOpenAdsEnabled, interstitial=$_interstitialAdsEnabled, rewarded=$_rewardedAdsEnabled, actions=$_interstitialActionCounterThreshold');
     } catch (e) {
       debugPrint('[AdService] Remote Config error (using defaults): $e');
     }
@@ -173,17 +167,23 @@ class AdService {
     final effectiveTimeout = timeout ?? Duration(seconds: _appOpenTimeoutSeconds);
     final completer = Completer<bool>();
     _isAppOpenLoading = true;
+    bool hasTimedOut = false;
 
     AppOpenAd.load(
       adUnitId: appOpenAdUnitId,
       request: const AdRequest(),
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) {
-          _appOpenAd = ad;
           _isAppOpenLoading = false;
-          if (!completer.isCompleted) {
-            completer.complete(true);
+          if (hasTimedOut || completer.isCompleted) {
+            // Late arrival after splash timeout: dispose immediately to prevent orphan match
+            debugPrint('[AdService] AppOpenAd loaded after timeout - disposing to protect show rate');
+            ad.dispose();
+            _appOpenAd = null;
+            return;
           }
+          _appOpenAd = ad;
+          completer.complete(true);
         },
         onAdFailedToLoad: (error) {
           debugPrint('[AdService] AppOpenAd failed to load: $error');
@@ -196,11 +196,12 @@ class AdService {
       ),
     );
 
-    // Timeout watchdog (6-8s): bypass if internet is slow or ad network doesn't respond
+    // Timeout watchdog: bypass if internet is slow or ad network doesn't respond
     return Future.any([
       completer.future,
       Future.delayed(effectiveTimeout, () {
         if (!completer.isCompleted) {
+          hasTimedOut = true;
           debugPrint('[AdService] AppOpenAd load timed out after ${effectiveTimeout.inSeconds}s');
           _isAppOpenLoading = false;
           completer.complete(false);
@@ -210,11 +211,18 @@ class AdService {
     ]);
   }
 
+  /// Explicitly marks that the App Open ad has been handled for this session.
+  /// Prevents any ad from showing on background resume.
+  void markAppOpenSessionHandled() {
+    _hasShownAppOpenThisSession = true;
+  }
+
   /// Shows the loaded App Open Ad if available.
   /// Once shown or skipped, marks _hasShownAppOpenThisSession = true so it NEVER shows on resume.
   void showAppOpenAdIfAvailable({required VoidCallback onDismissed}) {
-    if (!isAppOpenAdsEnabled || _hasShownAppOpenThisSession || _appOpenAd == null) {
-      _hasShownAppOpenThisSession = true;
+    _hasShownAppOpenThisSession = true;
+
+    if (!isAppOpenAdsEnabled || _appOpenAd == null) {
       onDismissed();
       return;
     }
@@ -227,14 +235,12 @@ class AdService {
         debugPrint('[AdService] AppOpenAd dismissed');
         ad.dispose();
         _appOpenAd = null;
-        _hasShownAppOpenThisSession = true;
         onDismissed();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         debugPrint('[AdService] AppOpenAd failed to show: $error');
         ad.dispose();
         _appOpenAd = null;
-        _hasShownAppOpenThisSession = true;
         onDismissed();
       },
     );
@@ -243,7 +249,7 @@ class AdService {
   }
 
   // ===========================================================================
-  // 2. INTERSTITIAL ADS (10-15 ACTIONS IN EDITOR)
+  // 2. INTERSTITIAL ADS (JUST-IN-TIME: PRELOAD AT 8, SHOW AT 10)
   // ===========================================================================
 
   /// Preload Interstitial Ad in background
@@ -272,43 +278,46 @@ class AdService {
   }
 
   /// Register an action in the editor (e.g. adding shape, flower, text, moving, changing style).
-  /// If action count reaches the threshold (10-15) and cooldown passed, displays interstitial.
+  /// Preloads at action #8, displays at action #10.
   void registerAction(BuildContext context) {
     if (!isInterstitialAdsEnabled) return;
 
     _currentActionCount++;
     debugPrint('[AdService] Action registered: $_currentActionCount/$_interstitialActionCounterThreshold');
 
+    // Preload just-in-time on action #8 so it is ready by action #10
+    if (_currentActionCount == _interstitialPreloadThreshold) {
+      preloadInterstitialAd();
+    }
+
     if (_currentActionCount >= _interstitialActionCounterThreshold) {
-      final now = DateTime.now();
-      if (_lastInterstitialShowTime == null ||
-          now.difference(_lastInterstitialShowTime!).inSeconds >= _interstitialCooldownSeconds) {
-        _showInterstitial(context);
-      }
+      _showInterstitial(context);
     }
   }
 
   /// Show the interstitial ad if available
   void _showInterstitial(BuildContext context) {
     if (_interstitialAd == null) {
+      // If not ready yet, request preload so subsequent action can show it
       preloadInterstitialAd();
       return;
     }
 
     _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) {
-        _lastInterstitialShowTime = DateTime.now();
         _currentActionCount = 0;
       },
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         _interstitialAd = null;
-        preloadInterstitialAd(); // Preload next one
+        _currentActionCount = 0;
+        // Do NOT immediately preload here (prevents ghost requests when user exits)
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
+        debugPrint('[AdService] InterstitialAd failed to show: $error');
         ad.dispose();
         _interstitialAd = null;
-        preloadInterstitialAd();
+        _currentActionCount = 0;
       },
     );
 
@@ -316,7 +325,7 @@ class AdService {
   }
 
   // ===========================================================================
-  // 3. REWARDED ADS (WATCH AD TO EXPORT)
+  // 3. REWARDED ADS (JUST-IN-TIME: PRELOAD ON EXPORT CLICK)
   // ===========================================================================
 
   /// Preload Rewarded Ad in background
@@ -345,13 +354,13 @@ class AdService {
   }
 
   /// Shows the Rewarded Ad when the user requests to export.
-  /// If the ad plays and user earns reward, invokes onUserEarnedReward.
+  /// If the ad is loading, waits briefly so the user actually sees it.
   /// If ad is not ready or network fails, gracefully invokes onUserEarnedReward as a fail-safe.
-  void showRewardedAd(
+  Future<void> showRewardedAd(
     BuildContext context, {
     required VoidCallback onUserEarnedReward,
     VoidCallback? onDismissed,
-  }) {
+  }) async {
     if (!isRewardedAdsEnabled) {
       // Ads disabled: grant immediately
       onUserEarnedReward();
@@ -359,10 +368,18 @@ class AdService {
       return;
     }
 
+    // If ad is currently loading, wait up to 3 seconds for it to finish
+    if (_rewardedAd == null && _isRewardedLoading) {
+      int waitedMs = 0;
+      while (_isRewardedLoading && waitedMs < 3000) {
+        await Future.delayed(const Duration(milliseconds: 150));
+        waitedMs += 150;
+      }
+    }
+
     if (_rewardedAd == null) {
       // Fail-safe: If ad isn't loaded, grant reward anyway so user is never blocked
       debugPrint('[AdService] RewardedAd not ready, granting fail-safe download reward');
-      preloadRewardedAd();
       onUserEarnedReward();
       onDismissed?.call();
       return;
@@ -377,7 +394,7 @@ class AdService {
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         _rewardedAd = null;
-        preloadRewardedAd(); // Preload next one
+        // Do NOT reload here (stops ghost ads when user finishes exporting)
         if (userEarnedReward) {
           onUserEarnedReward();
         }
@@ -387,7 +404,6 @@ class AdService {
         debugPrint('[AdService] RewardedAd failed to show: $error');
         ad.dispose();
         _rewardedAd = null;
-        preloadRewardedAd();
         // Fail-safe: grant reward anyway
         onUserEarnedReward();
         onDismissed?.call();
@@ -443,6 +459,12 @@ class _UnlockTemplateSheet extends StatefulWidget {
 
 class _UnlockTemplateSheetState extends State<_UnlockTemplateSheet> {
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AdService.instance.preloadRewardedAd();
+  }
 
   void _watchAdToUnlock() {
     if (_isLoading) return;

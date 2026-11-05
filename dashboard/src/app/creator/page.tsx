@@ -281,6 +281,7 @@ function CreatorStudio() {
 
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isAspectRatioLocked, setIsAspectRatioLocked] = useState(false);
   const [isNearMargin, setIsNearMargin] = useState(false);
   
   const bgInputRef = useRef<HTMLInputElement>(null);
@@ -1526,7 +1527,11 @@ function CreatorStudio() {
                   disableDragging={true}
                   dragGrid={snapToGrid ? [10 * scale, 10 * scale] : undefined}
                   resizeGrid={snapToGrid ? [10 * scale, 10 * scale] : undefined}
-                  lockAspectRatio={false}
+                  lockAspectRatio={isAspectRatioLocked}
+                  onResizeStart={(e, direction) => {
+                    const isCorner = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'].includes(direction);
+                    setIsAspectRatioLocked(isCorner);
+                  }}
                   onResizeStop={(e, direction, ref, delta, position) => {
                     setIsDragging(false);
                     const newWidth = ref.offsetWidth / scale;

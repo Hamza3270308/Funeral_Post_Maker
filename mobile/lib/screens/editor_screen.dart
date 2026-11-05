@@ -1439,6 +1439,7 @@ class _EditorScreenState extends State<EditorScreen> {
           fontWeight: layer.fontWeight == 'bold' ? FontWeight.w700 : FontWeight.w400,
           fontStyle: layer.fontStyle == 'italic' ? FontStyle.italic : FontStyle.normal,
           decoration: layer.textDecoration == 'underline' ? TextDecoration.underline : TextDecoration.none,
+          decorationColor: _parseHexColor(layer.color),
           color: _parseHexColor(layer.color),
           letterSpacing: layer.letterSpacing * w,
           height: layer.lineHeight,
@@ -1459,6 +1460,7 @@ class _EditorScreenState extends State<EditorScreen> {
           fontWeight: layer.fontWeight == 'bold' ? FontWeight.w700 : FontWeight.w400,
           fontStyle: layer.fontStyle == 'italic' ? FontStyle.italic : FontStyle.normal,
           decoration: layer.textDecoration == 'underline' ? TextDecoration.underline : TextDecoration.none,
+          decorationColor: _parseHexColor(layer.color),
           color: _parseHexColor(layer.color),
           letterSpacing: layer.letterSpacing * w,
           height: layer.lineHeight,
@@ -2228,6 +2230,105 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  void _loadTemplate(Template newTemplate) {
+    setState(() {
+      _activeTray = ActiveTrayType.none;
+      _deselectAll();
+
+      final cloned = Template.fromJson(newTemplate.toJson());
+      widget.template.id = cloned.id;
+      widget.template.title = cloned.title;
+      _designTitle = cloned.title.isNotEmpty ? cloned.title : 'Memorial Tribute';
+      widget.template.width = cloned.width;
+      widget.template.height = cloned.height;
+      widget.template.status = cloned.status;
+      widget.template.thumbnailUrl = cloned.thumbnailUrl;
+      widget.template.background = cloned.background;
+
+      widget.template.textLayers.clear();
+      widget.template.textLayers.addAll(cloned.textLayers);
+      widget.template.imageLayers.clear();
+      widget.template.imageLayers.addAll(cloned.imageLayers);
+      widget.template.shapeLayers.clear();
+      widget.template.shapeLayers.addAll(cloned.shapeLayers);
+
+      _localBackgroundPath = null;
+      _localPhotoPath = null;
+      _customFrameImagePath = null;
+
+      // Sync local text strings
+      final layers = widget.template.textLayers;
+      _startingLine = layers.isNotEmpty ? layers[0].content : '';
+      _deceasedName = layers.length > 1 ? layers[1].content : '';
+      _lifespanDates = layers.length > 2 ? layers[2].content : '';
+      _messageContent = layers.length > 3 ? layers[3].content : '';
+
+      _rebuildTextStyles();
+
+      // Pre-load Google Fonts
+      final usedFonts = layers.map((l) => l.fontFamily).toSet();
+      for (final fontName in usedFonts) {
+        try {
+          GoogleFonts.getFont(fontName);
+        } catch (_) {}
+      }
+
+      // Initialize frame shape
+      final frameLayer = widget.template.imageLayers
+          .where((l) => l.type == 'frame')
+          .cast<ImageLayer?>()
+          .firstWhere((_) => true, orElse: () => null);
+      if (frameLayer != null) {
+        switch (frameLayer.maskShape) {
+          case 'circle':
+            _frameShapeIndex = 0;
+            break;
+          case 'rounded_rect':
+            _frameShapeIndex = 2;
+            break;
+          default:
+            _frameShapeIndex = 2;
+            break;
+        }
+      } else {
+        _frameShapeIndex = 2;
+      }
+
+      // Restore stickers
+      _overlayItems.clear();
+      final stickerLayers = widget.template.imageLayers.where((l) => l.type == 'sticker').toList();
+      for (var layer in stickerLayers) {
+        if (layer.url.isNotEmpty) {
+          final cleanFileName = layer.url.split('/').last.split('?').first;
+          final graphic = MemorialElementsLibrary.graphics.firstWhere(
+            (g) => g.imageFile == cleanFileName,
+            orElse: () => MemorialGraphic(
+              id: 'sticker_${layer.id}',
+              category: 'Floral Designs',
+              name: 'Sticker',
+              imageFile: layer.url.startsWith('/') ? layer.url.substring(1) : layer.url,
+            ),
+          );
+          _overlayItems.add(CanvasOverlayItem(
+            id: layer.id,
+            graphic: graphic,
+            position: Offset(layer.x * widget.template.width, layer.y * widget.template.height),
+            scale: layer.width / 0.9,
+            rotation: layer.rotation,
+            opacity: layer.opacity,
+            color: graphic.defaultColor,
+            zIndex: layer.zIndex,
+          ));
+        }
+      }
+
+      // Reset history for the new template
+      _history.clear();
+      _historyIndex = -1;
+      _saveState();
+    });
+  }
+
   // 1. TEMPLATES TRAY (Crisp Light Theme + Lime Green Accent)
   Widget _buildTemplatesTray() {
     return FutureBuilder<List<Template>>(
@@ -2245,10 +2346,7 @@ class _EditorScreenState extends State<EditorScreen> {
             final t = templates[idx];
             return GestureDetector(
               onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => EditorScreen(template: t)),
-                );
+                _loadTemplate(t);
               },
               child: Container(
                 width: 120,
@@ -3436,12 +3534,18 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _changeTextSize(double delta) {
+    if (!_textStyles.containsKey(_selectedType)) return;
+
+    final style = _textStyles[_selectedType]!;
+    final newSize = (style.size + delta).clamp(12.0, 400.0);
+    
     setState(() {
-      if (_textStyles.containsKey(_selectedType)) {
-        final style = _textStyles[_selectedType]!;
-        style.size = (style.size + delta).clamp(10.0, 120.0);
-      }
+      style.size = newSize;
     });
+    
+    _updateActiveTextProperty((layer) {
+      layer.fontSize = newSize / 1080;
+    }, saveState: true);
   }
 
   void _showPositionSheet() {

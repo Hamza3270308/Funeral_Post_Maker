@@ -45,43 +45,6 @@ class _ExportScreenState extends State<ExportScreen> {
     super.dispose();
   }
 
-  void _showRenameDialog() {
-    _titleController.text = _currentTitle;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Rename Memorial Design', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: TextField(
-          controller: _titleController,
-          decoration: const InputDecoration(
-            labelText: 'Design Title',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                if (_titleController.text.trim().isNotEmpty) {
-                  _currentTitle = _titleController.text.trim();
-                }
-              });
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFBAFF00),
-              foregroundColor: Colors.black,
-            ),
-            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _saveToDevice() async {
     setState(() {
@@ -198,6 +161,9 @@ class _ExportScreenState extends State<ExportScreen> {
       return;
     }
 
+    // Preload Rewarded Ad just-in-time while the user reviews the confirmation dialog
+    AdService.instance.preloadRewardedAd();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -208,14 +174,14 @@ class _ExportScreenState extends State<ExportScreen> {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Watch Ad to Download',
+                'Watch Ad & Export Template',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
             ),
           ],
         ),
         content: const Text(
-          'Watch a short video ad to download your high-resolution memorial tribute for free.',
+          'Watch a short video ad to export and download your high-resolution memorial tribute to your photo library for free.',
           style: TextStyle(fontSize: 14, height: 1.4),
         ),
         actions: [
@@ -235,7 +201,7 @@ class _ExportScreenState extends State<ExportScreen> {
             },
             icon: const Icon(Icons.play_arrow_rounded, color: Colors.black),
             label: const Text(
-              'Watch Ad',
+              'Watch Ad & Export',
               style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
             ),
             style: ElevatedButton.styleFrom(
@@ -251,46 +217,66 @@ class _ExportScreenState extends State<ExportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightBackground,
+      backgroundColor: AppTheme.backgroundCream,
       appBar: AppBar(
-        title: Row(
-          children: [
-            Flexible(
-              child: Text(
-                _currentTitle,
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              onPressed: _showRenameDialog,
-              tooltip: 'Rename Design',
-            ),
-          ],
+        title: const Text('Export Tribute', style: TextStyle(fontWeight: FontWeight.w800)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 120.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Preview Card Container
+              // Tribute Name Field
+              Card(
+                color: Colors.white,
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit_note_rounded, color: AppTheme.textGray, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _titleController,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'Enter tribute title...',
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              _currentTitle = val.trim().isEmpty ? 'Memorial Tribute' : val.trim();
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Image Preview Card
               Center(
                 child: Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.46,
-                    minHeight: 180,
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 320),
                   decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
@@ -309,10 +295,23 @@ class _ExportScreenState extends State<ExportScreen> {
                 elevation: 3,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                  leading: const Icon(Icons.download_rounded, color: AppTheme.textDark, size: 30),
-                  title: const Text('Save to Device', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                  subtitle: const Text('Download high-res PNG image to your photo library', style: TextStyle(fontSize: 13)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentNeon.withOpacity(0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.download_rounded, color: AppTheme.textDark, size: 24),
+                  ),
+                  title: const Text(
+                    'Export to Device',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                  subtitle: const Text(
+                    'Download high-res PNG image to your photo library',
+                    style: TextStyle(fontSize: 13, color: AppTheme.textGray),
+                  ),
                   trailing: _isSavingDevice
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.arrow_forward_ios_rounded, size: 16),

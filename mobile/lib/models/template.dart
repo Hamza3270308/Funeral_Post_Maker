@@ -1,11 +1,11 @@
 class Template {
-  final String id;
-  final String title;
-  final String status;
-  final String thumbnailUrl;
-  final double width;
-  final double height;
-  final Background background;
+  String id;
+  String title;
+  String status;
+  String thumbnailUrl;
+  double width;
+  double height;
+  Background background;
   final List<TextLayer> textLayers;
   final List<ImageLayer> imageLayers;
   final List<ShapeLayer> shapeLayers;

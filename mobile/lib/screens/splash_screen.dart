@@ -38,6 +38,20 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _checkInternetAndProceed();
   }
 
+  Future<bool> _verifyInternetAccess() async {
+    for (final host in ['google.com', 'cloudflare.com']) {
+      try {
+        final result = await InternetAddress.lookup(host).timeout(const Duration(seconds: 3));
+        if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+          return true;
+        }
+      } catch (_) {
+        // Try next host
+      }
+    }
+    return false;
+  }
+
   Future<void> _checkInternetAndProceed() async {
     if (_isChecking) return;
     setState(() {
@@ -46,12 +60,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     });
 
     try {
-      bool hasConnection = false;
-      try {
-        final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 4));
-        hasConnection = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-      } catch (_) {
-        hasConnection = false;
+      bool hasConnection = await _verifyInternetAccess();
+
+      // If initial check fails, retry once before displaying the offline screen.
+      if (!hasConnection) {
+        await Future.delayed(const Duration(milliseconds: 1000));
+        hasConnection = await _verifyInternetAccess();
       }
 
       if (!hasConnection) {
@@ -64,15 +78,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         return;
       }
 
-      // Internet connection available: initialize settings and attempt App Open Ad
-      await UserSettingsService.instance.init();
-
-      // Only attempt App Open Ad on cold launch and if enabled
+      // Internet is active: load settings and fetch App Open Ad in parallel
       if (AdService.instance.isAppOpenAdsEnabled && !AdService.instance.hasShownAppOpenThisSession) {
-        // Wait for App Open Ad with 6s timeout watchdog
-        final adLoaded = await AdService.instance.loadAppOpenAdWithTimeout(
+        final adFuture = AdService.instance.loadAppOpenAdWithTimeout(
           timeout: Duration(seconds: AdService.instance.appOpenTimeoutSeconds),
         );
+        await UserSettingsService.instance.init();
+        final adLoaded = await adFuture;
 
         if (!mounted) return;
 
@@ -84,6 +96,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           );
           return;
         }
+      } else {
+        await UserSettingsService.instance.init();
       }
 
       // If ad was not shown/timed out/already shown, proceed to next screen
@@ -105,6 +119,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   void _proceedToNextScreen() {
+    // Permanently mark cold start App Open Ad handled so it never shows on background resume
+    AdService.instance.markAppOpenSessionHandled();
+
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final isGuest = UserSettingsService.instance.isGuest;
     final hasSeenOnboarding = UserSettingsService.instance.hasSeenOnboarding;
@@ -188,6 +205,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       fontFamily: 'Inter',
                       fontSize: 16,
                       color: Colors.white.withOpacity(0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppTheme.accentNeon.withOpacity(0.8),
+                      ),
                     ),
                   ),
                 ],

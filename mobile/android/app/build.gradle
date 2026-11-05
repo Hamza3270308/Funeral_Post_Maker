@@ -32,8 +32,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.hamitech.funeralpostmaker"
-    compileSdkVersion 36
-    ndkVersion = "25.1.8937393"
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -58,7 +57,7 @@ android {
         applicationId = "com.hamitech.funeralpostmaker"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdk = 23
+        minSdk = 24
         targetSdk = 36
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName

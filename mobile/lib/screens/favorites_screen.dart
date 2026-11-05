@@ -3,9 +3,7 @@ import '../models/template.dart';
 import '../services/api_service.dart';
 import '../services/user_settings_service.dart';
 import '../theme/theme.dart';
-import '../services/ad_service.dart';
 import 'editor_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/template_card_preview.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -167,16 +165,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     
     return GestureDetector(
       onTap: () {
-        AdService.instance.showUnlockTemplateDialog(
-          context,
-          template: template,
-          onUnlocked: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => EditorScreen(template: template),
-              ),
-            );
-          },
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EditorScreen(template: template),
+          ),
         );
       },
       child: Container(
@@ -200,42 +192,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 children: [
                   Positioned.fill(
                     child: TemplateCardPreview(template: template),
-                  ),
-                  ListenableBuilder(
-                    listenable: UserSettingsService.instance,
-                    builder: (context, _) {
-                      final isUnlocked = UserSettingsService.instance.isTemplateUnlocked(template.id);
-                      if (isUnlocked || !AdService.instance.isRewardedAdsEnabled) {
-                        return const SizedBox.shrink();
-                      }
-                      return Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.65),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.lock_rounded, color: Color(0xFFFFD54F), size: 13),
-                              SizedBox(width: 4),
-                              Text(
-                                'Watch to Unlock',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
                   ),
                   Positioned(
                     top: 8,
